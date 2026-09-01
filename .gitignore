@@ -1,0 +1,33 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.log
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+*.keystore
+*.jks
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large local downloads / an SDK extracted into the project folder by mistake
+Unconfirmed*.crdownload
+flutter_windows*/
+/flutter/

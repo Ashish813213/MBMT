@@ -1,0 +1,25 @@
+name: mbmt_smart_bus
+description: >-
+  MBMT Smart Bus - a proposed redesigned public transport app for
+  Mira-Bhayandar Municipal Transport. College / project presentation prototype.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+# No third-party packages are used. Everything is built on the Flutter SDK
+# (Material 3, CustomPainter, ChangeNotifier, InheritedNotifier, Navigator).
+# This keeps the project buildable offline with just `flutter pub get`.
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
