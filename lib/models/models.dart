@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
+
 /// ---------------------------------------------------------------------------
 /// Enums + small helpers
 /// ---------------------------------------------------------------------------
@@ -7,72 +9,108 @@ import 'package:flutter/material.dart';
 enum Crowd { low, medium, high }
 
 extension CrowdX on Crowd {
-  String get label {
-    switch (this) {
-      case Crowd.low:
-        return 'Low Crowd';
-      case Crowd.medium:
-        return 'Medium Crowd';
-      case Crowd.high:
-        return 'High Crowd';
+   String get label {
+     switch (this) {
+       case Crowd.low:
+         return 'Low Crowd';
+       case Crowd.medium:
+         return 'Medium Crowd';
+       case Crowd.high:
+         return 'High Crowd';
+     }
+   }
+
+   String labelOf(String lang) {
+     switch (this) {
+       case Crowd.low:
+         return Strings.t(lang, 'crowd_low');
+       case Crowd.medium:
+         return Strings.t(lang, 'crowd_medium');
+       case Crowd.high:
+         return Strings.t(lang, 'crowd_high');
+     }
+   }
+
+   /// Short label used on tight cards.
+   String get shortLabel {
+     switch (this) {
+       case Crowd.low:
+         return 'Low';
+       case Crowd.medium:
+         return 'Medium';
+       case Crowd.high:
+         return 'High';
+     }
+   }
+
+    String shortLabelOf(String lang) {
+      switch (this) {
+        case Crowd.low:
+          return Strings.t(lang, 'crowd_short_low');
+        case Crowd.medium:
+          return Strings.t(lang, 'crowd_short_medium');
+        case Crowd.high:
+          return Strings.t(lang, 'crowd_short_high');
+      }
     }
+
   }
 
-  /// Short label used on tight cards.
-  String get shortLabel {
-    switch (this) {
-      case Crowd.low:
-        return 'Low';
-      case Crowd.medium:
-        return 'Medium';
-      case Crowd.high:
-        return 'High';
-    }
-  }
-
-  String get dot {
-    switch (this) {
-      case Crowd.low:
-        return '\u{1F7E2}'; // green circle
-      case Crowd.medium:
-        return '\u{1F7E1}'; // yellow circle
-      case Crowd.high:
-        return '\u{1F534}'; // red circle
-    }
-  }
-}
-
-enum BusStatus { arriving, onTime, delayed }
+  enum BusStatus { arriving, onTime, delayed }
 
 extension BusStatusX on BusStatus {
-  String get label {
-    switch (this) {
-      case BusStatus.arriving:
-        return 'Arriving soon';
-      case BusStatus.onTime:
-        return 'On time';
-      case BusStatus.delayed:
-        return 'Delayed';
-    }
-  }
-}
+   String get label {
+     switch (this) {
+       case BusStatus.arriving:
+         return 'Arriving soon';
+       case BusStatus.onTime:
+         return 'On time';
+       case BusStatus.delayed:
+         return 'Delayed';
+     }
+   }
+
+   String labelOf(String lang) {
+     switch (this) {
+       case BusStatus.arriving:
+         return Strings.t(lang, 'bus_arriving_soon');
+       case BusStatus.onTime:
+         return Strings.t(lang, 'bus_on_time');
+       case BusStatus.delayed:
+         return Strings.t(lang, 'bus_delayed');
+     }
+   }
+ }
 
 enum UpdateType { diversion, delay, cancellation, information }
 
 extension UpdateTypeX on UpdateType {
-  String get label {
-    switch (this) {
-      case UpdateType.diversion:
-        return 'Diversion';
-      case UpdateType.delay:
-        return 'Delay';
-      case UpdateType.cancellation:
-        return 'Cancellation';
-      case UpdateType.information:
-        return 'Information';
-    }
-  }
-}
+   String get label {
+     switch (this) {
+       case UpdateType.diversion:
+         return 'Diversion';
+       case UpdateType.delay:
+         return 'Delay';
+       case UpdateType.cancellation:
+         return 'Cancellation';
+       case UpdateType.information:
+         return 'Information';
+     }
+   }
+
+   String labelOf(String lang) {
+     switch (this) {
+       case UpdateType.diversion:
+         return Strings.t(lang, 'update_diversion');
+       case UpdateType.delay:
+         return Strings.t(lang, 'update_delay');
+       case UpdateType.cancellation:
+         return Strings.t(lang, 'update_cancellation');
+       case UpdateType.information:
+         return Strings.t(lang, 'update_information');
+     }
+   }
+ }
 
 enum UpdateSeverity { info, warning, critical }
 

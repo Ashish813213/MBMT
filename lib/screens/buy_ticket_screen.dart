@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/pickers.dart';
+import '../data/mock_data.dart';
 import 'payment_screen.dart';
 
 class BuyTicketScreen extends StatelessWidget {
@@ -59,21 +60,24 @@ class BuyTicketScreen extends StatelessWidget {
                   },
                 ),
                 const Divider(height: 1),
-                _Field(
-                  icon: Icons.event_rounded,
-                  color: AppColors.inkSoft,
-                  label: 'JOURNEY DATE',
-                  value: d.date,
-                  onTap: () async {
-                    final String? v = await pickOption(
-                      context,
-                      title: 'Journey date',
-                      current: d.date,
-                      options: const <String>['Today', 'Tomorrow'],
-                    );
-                    if (v != null) s.setTicketDraft(d.copyWith(date: v));
-                  },
-                ),
+                  _Field(
+                   icon: Icons.event_rounded,
+                   color: AppColors.inkSoft,
+                   label: 'JOURNEY DATE',
+                   value: d.date,
+                   onTap: () async {
+                     final String? v = await pickOption(
+                       context,
+                       title: 'Journey date',
+                       current: d.date,
+                       options: const <String>['Today', 'Tomorrow'],
+                     );
+                     if (v != null) {
+                       final int fare = MockData.fareForRoute(d.route);
+                       s.setTicketDraft(d.copyWith(date: v, fare: fare));
+                     }
+                   },
+                 ),
               ],
             ),
           ),

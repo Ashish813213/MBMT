@@ -223,6 +223,23 @@ class MockData {
     ),
   ];
 
+  static int fareForRoute(String routeNumber) {
+    try {
+      return nearbyBuses.firstWhere((Bus b) => b.number == routeNumber).fare;
+    } catch (_) {
+      return 25;
+    }
+  }
+
+  static String busNumberForStops(String from, String to) {
+    for (final Bus b in nearbyBuses) {
+      if (b.stops.contains(from) && b.stops.contains(to)) {
+        return b.number;
+      }
+    }
+    return nearbyBuses.first.number;
+  }
+
   static Bus busByNumber(String number) {
     return nearbyBuses.firstWhere(
       (Bus b) => b.number.toLowerCase() == number.toLowerCase(),
@@ -330,21 +347,21 @@ class MockData {
   ];
 
   static const List<FrequentJourney> frequentJourneys = <FrequentJourney>[
-    FrequentJourney(
-      id: 'fj1',
-      from: 'Home',
-      to: 'Thane Station',
-      nextBusMin: 8,
-      busNumber: '45A',
-    ),
-    FrequentJourney(
-      id: 'fj2',
-      from: 'Home',
-      to: 'Bhayandar Station (E)',
-      nextBusMin: 13,
-      busNumber: '20',
-    ),
-  ];
+     FrequentJourney(
+       id: 'fj1',
+       from: 'Mira Road Station (E)',
+       to: 'Thane Station',
+       nextBusMin: 8,
+       busNumber: '45A',
+     ),
+     FrequentJourney(
+       id: 'fj2',
+       from: 'Mira Road Station (E)',
+       to: 'Bhayandar Station (E)',
+       nextBusMin: 13,
+       busNumber: '20',
+     ),
+   ];
 
   static const List<String> recentSearches = <String>['Thane Station', 'Bhayandar Station (E)', '45A'];
 

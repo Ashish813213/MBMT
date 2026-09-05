@@ -157,11 +157,10 @@ class _HistoryTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
       itemCount: past.length,
       separatorBuilder: (BuildContext _, int __) => const SizedBox(height: 12),
-      itemBuilder: (BuildContext context, int i) => TicketCard(
-        ticket: past[i],
-        onTap: () => showToast(context, 'Ticket ${past[i].id}',
-            icon: Icons.confirmation_number_rounded),
-      ),
+itemBuilder: (BuildContext context, int i) => TicketCard(
+         ticket: past[i],
+         onTap: () => pushPage(context, ActiveTicketScreen(ticket: past[i])),
+       ),
     );
   }
 }

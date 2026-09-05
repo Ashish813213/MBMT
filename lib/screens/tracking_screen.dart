@@ -55,7 +55,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   int get _nextStopIndex {
     final int n = _bus.stops.length;
-    return (_progress * (n - 1)).ceil().clamp(1, n - 1);
+    return (_progress * (n - 1)).ceil().clamp(0, n - 1);
   }
 
   double get _distanceKm => (_bus.distanceKm * (_eta / _initialEta)).clamp(0.1, _bus.distanceKm);

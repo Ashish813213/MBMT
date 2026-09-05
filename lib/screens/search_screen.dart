@@ -65,16 +65,16 @@ class _SearchScreenState extends State<SearchScreen> {
     final AppState s = AppScope.of(context);
     s.addRecentSearch(r.kind == SearchKind.bus ? r.title.replaceFirst('Bus ', '') : r.title);
 
-    if (r.kind == SearchKind.bus || r.kind == SearchKind.route) {
-      final String number = r.title.replaceFirst('Bus ', '').trim();
-      pushReplacementPage(context, TrackingScreen(busNumber: number));
-    } else {
-      s.openPlanner(s.originStop, r.title);
-      Navigator.of(context).pop();
-    }
-  }
+    if (r.kind == SearchKind.bus) {
+       final String number = r.title.replaceFirst('Bus ', '').trim();
+       pushReplacementPage(context, TrackingScreen(busNumber: number));
+     } else {
+       s.openPlanner(s.originStop, r.title);
+       Navigator.of(context).pop();
+     }
+   }
 
-  void _chooseRaw(BuildContext context, String value) {
+   void _chooseRaw(BuildContext context, String value) {
     final AppState s = AppScope.of(context);
     s.addRecentSearch(value);
     final List<Bus> matches = MockData.nearbyBuses
@@ -116,16 +116,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 focusedBorder: InputBorder.none,
                 hintText: s.t('search_placeholder'),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.brand),
-                suffixIcon: IconButton(
-                  tooltip: 'Voice search (demo)',
-                  icon: const Icon(Icons.mic_rounded, color: AppColors.brand),
-                  onPressed: () {
-                    _controller.text = 'Thane Station';
-                    setState(() => _query = 'Thane Station');
-                    showToast(context, 'Voice search is simulated in this prototype',
-                        icon: Icons.mic_rounded);
-                  },
-                ),
+suffixIcon: IconButton(
+                   tooltip: 'Voice search (demo)',
+                   icon: const Icon(Icons.mic_rounded, color: AppColors.brand),
+                   onPressed: () {
+                     setState(() {
+                       _controller.text = '';
+                       _query = '';
+                     });
+                     showToast(context, 'Voice search is simulated in this prototype',
+                         icon: Icons.mic_rounded);
+                   },
+                 ),
               ),
             ),
           ),
@@ -212,17 +214,18 @@ class _ResultTile extends StatelessWidget {
   final SearchResult result;
   final VoidCallback onTap;
 
-  IconData get _icon {
-    switch (result.kind) {
-      case SearchKind.bus:
-      case SearchKind.route:
-        return Icons.directions_bus_rounded;
-      case SearchKind.stop:
-        return Icons.signpost_rounded;
-      case SearchKind.destination:
-        return Icons.place_rounded;
-    }
-  }
+IconData get _icon {
+     switch (result.kind) {
+       case SearchKind.bus:
+         return Icons.directions_bus_rounded;
+       case SearchKind.stop:
+         return Icons.signpost_rounded;
+       case SearchKind.destination:
+         return Icons.place_rounded;
+       case SearchKind.route:
+         return Icons.directions_bus_rounded;
+     }
+   }
 
   @override
   Widget build(BuildContext context) {

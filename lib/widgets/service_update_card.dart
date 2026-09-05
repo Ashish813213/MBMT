@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 
 class UpdateStyle {
@@ -53,7 +54,7 @@ class ServiceUpdateBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text('\u{1F4E2} Service Update',
+                const Text('Service Update',
                     style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 Text(
@@ -93,6 +94,8 @@ class ServiceUpdateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final UpdateStyle st = styleFor(update.type);
+    final AppState s = AppScope.of(context);
+    final String lang = s.language;
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -116,10 +119,10 @@ class ServiceUpdateCard extends StatelessWidget {
                   children: <Widget>[
                     Icon(st.icon, size: 13, color: st.color),
                     const SizedBox(width: 4),
-                    Text(
-                      update.type.label,
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: st.color),
-                    ),
+Text(
+                       update.type.labelOf(lang),
+                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: st.color),
+                     ),
                   ],
                 ),
               ),

@@ -180,9 +180,9 @@ class GreetingBlock extends StatelessWidget {
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5),
               ),
             ),
-            const SizedBox(width: 6),
-            const Text('\u{1F44B}', style: TextStyle(fontSize: 22)),
-          ],
+const SizedBox(width: 6),
+              const Icon(Icons.waving_hand_rounded, size: 22),
+             ],
         ),
         const SizedBox(height: 2),
         Text(

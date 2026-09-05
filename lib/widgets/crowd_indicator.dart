@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 
 Color crowdColor(Crowd c) {
@@ -24,6 +25,8 @@ class CrowdIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppState s = AppScope.of(context);
+    final String lang = s.language;
     final Color c = crowdColor(crowd);
     final int filled = crowd == Crowd.low
         ? 1
@@ -32,7 +35,7 @@ class CrowdIndicator extends StatelessWidget {
             : 3;
 
     return Semantics(
-      label: 'Crowd level: ${crowd.label}',
+      label: 'Crowd level: ${crowd.shortLabelOf(lang)}',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -51,7 +54,7 @@ class CrowdIndicator extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            compact ? crowd.shortLabel : crowd.label,
+            compact ? crowd.shortLabelOf(lang) : crowd.labelOf(lang),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c),
           ),
         ],
@@ -66,6 +69,8 @@ class CrowdLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppState s = AppScope.of(context);
+    final String lang = s.language;
     Widget item(Crowd c) => Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -75,7 +80,7 @@ class CrowdLegend extends StatelessWidget {
               decoration: BoxDecoration(color: crowdColor(c), shape: BoxShape.circle),
             ),
             const SizedBox(width: 6),
-            Text(c.shortLabel, style: const TextStyle(fontSize: 12, color: AppColors.inkSoft)),
+            Text(c.shortLabelOf(lang), style: const TextStyle(fontSize: 12, color: AppColors.inkSoft)),
           ],
         );
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../nav.dart';
 import '../screens/tracking_screen.dart';
+import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'crowd_indicator.dart';
 import 'status_badge.dart';
@@ -21,10 +22,12 @@ class BusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppState s = AppScope.of(context);
+    final String lang = s.language;
     return Semantics(
       button: true,
       label:
-          'Bus ${bus.number} to ${bus.destination} via ${bus.via}. Arrives in ${bus.etaMin} minutes. Fare ${bus.fare} rupees. ${bus.crowd.label}.',
+          'Bus ${bus.number} to ${bus.destination} via ${bus.via}. Arrives in ${bus.etaMin} minutes. Fare ${bus.fare} rupees. ${bus.crowd.shortLabelOf(lang)}.',
       child: Material(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
@@ -56,8 +59,7 @@ class BusCard extends StatelessWidget {
                         'Via ${bus.via}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: AppColors.inkSoft),
-                      ),
+                        style: const TextStyle(fontSize: 12, color: AppColors.inkSoft)),
                       const SizedBox(height: 7),
                       Wrap(
                         spacing: 8,

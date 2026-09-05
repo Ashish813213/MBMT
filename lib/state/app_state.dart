@@ -81,13 +81,14 @@ class AppState extends ChangeNotifier {
   List<FrequentJourney> get favourites => List<FrequentJourney>.unmodifiable(_favourites);
 
   void addFavourite(String from, String to) {
+    final String busNumber = MockData.busNumberForStops(from, to);
     _favourites.add(
       FrequentJourney(
         id: 'fj${DateTime.now().microsecondsSinceEpoch}',
         from: from,
         to: to,
         nextBusMin: 5 + Random().nextInt(20),
-        busNumber: MockData.routeOptions.first.busNumber,
+        busNumber: busNumber,
       ),
     );
     notifyListeners();
@@ -177,7 +178,7 @@ class AppState extends ChangeNotifier {
     plannerFrom = from;
     plannerTo = to;
     plannerShowResults = auto;
-    _tabIndex = 1;
+    setTab(1);
     notifyListeners();
   }
 
@@ -263,7 +264,9 @@ class AppScope extends InheritedNotifier<AppState> {
 
   static AppState of(BuildContext context) {
     final AppScope? scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, 'AppScope.of() called with no AppScope in the tree.');
-    return scope!.notifier!;
+    if (scope == null) {
+      throw StateError('AppScope.of() called with no AppScope in the tree.');
+    }
+    return scope.notifier!;
   }
 }

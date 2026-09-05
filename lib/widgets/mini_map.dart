@@ -184,9 +184,9 @@ class _MapPainter extends CustomPainter {
     canvas.drawCircle(busPos, 12, Paint()..color = Colors.white);
     canvas.drawCircle(busPos, 12, Paint()..color = AppColors.live..style = PaintingStyle.stroke..strokeWidth = 3);
     final TextPainter tp = TextPainter(
-      text: const TextSpan(
+      text: TextSpan(
         text: String.fromCharCode(Icons.directions_bus_rounded.codePoint),
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 13,
           fontFamily: 'MaterialIcons',
           color: AppColors.live,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 
 /// Small coloured status chip for a bus / trip.
@@ -15,6 +16,7 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppState s = AppScope.of(context);
     late final Color color;
     late final IconData icon;
     late final String text;
@@ -23,17 +25,17 @@ class StatusBadge extends StatelessWidget {
       case BusStatus.arriving:
         color = AppColors.live;
         icon = Icons.near_me_rounded;
-        text = 'Arriving soon';
+        text = s.t('bus_arriving_soon');
         break;
       case BusStatus.onTime:
         color = AppColors.live;
         icon = Icons.check_circle_rounded;
-        text = 'On time';
+        text = s.t('bus_on_time');
         break;
       case BusStatus.delayed:
         color = AppColors.warn;
         icon = Icons.access_time_rounded;
-        text = 'Delayed';
+        text = s.t('bus_delayed');
         break;
     }
 
