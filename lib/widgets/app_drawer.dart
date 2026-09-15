@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../nav.dart';
 import '../screens/accessibility_screen.dart';
+import '../screens/ai_assistant_screen.dart';
 import '../screens/service_updates_screen.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -65,6 +66,8 @@ class AppDrawer extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: <Widget>[
                   tile(Icons.home_rounded, 'Home', () => s.setTab(0)),
+                  tile(Icons.smart_toy_rounded, s.t('ai_assistant'),
+                      () => pushPage(context, const AiAssistantScreen())),
                   tile(Icons.alt_route_rounded, 'Plan a journey', () => s.setTab(1)),
                   tile(Icons.near_me_rounded, 'Track a bus', () => s.setTab(3)),
                   tile(Icons.confirmation_number_rounded, 'Tickets & passes', () => s.openTickets(0)),

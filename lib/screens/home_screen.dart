@@ -13,6 +13,7 @@ import '../widgets/journey_card.dart';
 import '../widgets/quick_action.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/service_update_card.dart';
+import 'ai_assistant_screen.dart';
 import 'buy_ticket_screen.dart';
 import 'favourites_screen.dart';
 import 'service_updates_screen.dart';
@@ -27,6 +28,13 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       drawer: const AppDrawer(),
       backgroundColor: AppColors.pageBg,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'ai-assistant-fab',
+        tooltip: s.t('ai_assistant'),
+        backgroundColor: AppColors.brand,
+        onPressed: () => pushPage(context, const AiAssistantScreen()),
+        child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -38,7 +46,7 @@ class HomeScreen extends StatelessWidget {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 children: <Widget>[
                   const GreetingBlock(),
                   const SizedBox(height: 16),

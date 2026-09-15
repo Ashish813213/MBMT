@@ -31,7 +31,8 @@ android {
 
     defaultConfig {
         applicationId = "com.mbmt.smart_bus"
-        minSdk = flutter.minSdkVersion
+        // Pinned (not flutter.minSdkVersion): the `record` package requires API 23+.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName

@@ -77,6 +77,11 @@ class Strings {
      'update_delay': 'Delay',
      'update_cancellation': 'Cancellation',
      'update_information': 'Information',
+     // MBMT Assistant
+     'ai_assistant': 'MBMT Assistant',
+     'ai_greeting': "Hi! I'm your MBMT assistant. Where would you like to go today?",
+     'ai_unconfigured':
+         'Assistant not configured. Run with --dart-define=OPENAI_API_KEY=... to enable live answers.',
    };
 
   /// Simplified English variants used when "Simple language" is enabled in
@@ -161,6 +166,11 @@ class Strings {
      'update_delay': 'विलंब',
      'update_cancellation': 'रद्दीकरण',
      'update_information': 'सूचना',
+     // MBMT Assistant
+     'ai_assistant': 'MBMT सहायक',
+     'ai_greeting': 'नमस्ते! मैं आपका MBMT सहायक हूँ। आज आप कहाँ जाना चाहते हैं?',
+     'ai_unconfigured':
+         'सहायक कॉन्फ़िगर नहीं है। लाइव उत्तर पाने के लिए --dart-define=OPENAI_API_KEY=... के साथ चलाएँ।',
    };
 
   static const Map<String, String> _mr = <String, String>{
@@ -228,6 +238,11 @@ class Strings {
      'update_delay': 'विलंब',
      'update_cancellation': 'रद्दीकरण',
      'update_information': 'सूचना',
+     // MBMT Assistant
+     'ai_assistant': 'MBMT सहाय्यक',
+     'ai_greeting': 'नमस्कार! मी तुमचा MBMT सहाय्यक आहे. आज तुम्हाला कुठे जायचे आहे?',
+     'ai_unconfigured':
+         'सहाय्यक कॉन्फिगर केलेला नाही. थेट उत्तरांसाठी --dart-define=OPENAI_API_KEY=... सह चालवा.',
    };
 
   static const Map<String, Map<String, String>> _tables = <String, Map<String, String>>{

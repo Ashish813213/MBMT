@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import 'accessibility_screen.dart';
+import 'ai_assistant_screen.dart';
 import 'favourites_screen.dart';
 import 'language_screen.dart';
 import 'profile_subscreens.dart';
@@ -72,6 +73,13 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 18),
 
           _Group(children: <Widget>[
+            NavRow(
+              icon: Icons.smart_toy_rounded,
+              title: s.t('ai_assistant'),
+              subtitle: 'Ask for routes, fares and directions',
+              onTap: () => pushPage(context, const AiAssistantScreen()),
+            ),
+            const Divider(height: 1),
             NavRow(
               icon: Icons.confirmation_number_rounded,
               title: 'My Tickets',

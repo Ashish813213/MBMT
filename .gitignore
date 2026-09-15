@@ -31,3 +31,7 @@ Thumbs.db
 Unconfirmed*.crdownload
 flutter_windows*/
 /flutter/
+
+# Local secrets - never commit a real API key. Copy secrets.example.json to
+# secrets.local.json and fill it in; this file stays local only.
+secrets.local.json

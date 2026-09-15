@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../nav.dart';
+import '../services/voice_input_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'tracking_screen.dart';
@@ -19,6 +20,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
+  bool _recording = false;
+  bool _transcribing = false;
 
   static const List<String> _examples = <String>[
     'Thane Station',
@@ -31,7 +34,49 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    if (VoiceInputService.instance.isRecording) {
+      VoiceInputService.instance.cancel();
+    }
     super.dispose();
+  }
+
+  Future<void> _toggleMic(BuildContext context) async {
+    if (_transcribing) return;
+
+    if (_recording) {
+      setState(() => _transcribing = true);
+      String? text;
+      String? failure;
+      try {
+        text = await VoiceInputService.instance.stopAndTranscribe();
+      } catch (e) {
+        failure = e.toString();
+      }
+      if (!mounted) return;
+      setState(() {
+        _recording = false;
+        _transcribing = false;
+        if (text != null && text!.isNotEmpty) {
+          _controller.text = text!;
+          _query = text!;
+        }
+      });
+      if (failure != null) {
+        showToast(context, failure, icon: Icons.error_outline_rounded);
+      } else if (text == null || text!.isEmpty) {
+        showToast(context, 'Could not hear anything - try again', icon: Icons.mic_off_rounded);
+      }
+      return;
+    }
+
+    final bool started = await VoiceInputService.instance.start();
+    if (!mounted) return;
+    if (started) {
+      setState(() => _recording = true);
+    } else {
+      showToast(context, 'Microphone permission is needed for voice search',
+          icon: Icons.mic_off_rounded);
+    }
   }
 
   List<SearchResult> get _results {
@@ -117,16 +162,19 @@ class _SearchScreenState extends State<SearchScreen> {
                 hintText: s.t('search_placeholder'),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.brand),
 suffixIcon: IconButton(
-                   tooltip: 'Voice search (demo)',
-                   icon: const Icon(Icons.mic_rounded, color: AppColors.brand),
-                   onPressed: () {
-                     setState(() {
-                       _controller.text = '';
-                       _query = '';
-                     });
-                     showToast(context, 'Voice search is simulated in this prototype',
-                         icon: Icons.mic_rounded);
-                   },
+                   tooltip: _recording ? 'Stop recording' : 'Voice search',
+                   icon: _transcribing
+                       ? const Padding(
+                           padding: EdgeInsets.all(4),
+                           child: SizedBox(
+                             width: 16,
+                             height: 16,
+                             child: CircularProgressIndicator(strokeWidth: 2),
+                           ),
+                         )
+                       : Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded,
+                           color: _recording ? AppColors.danger : AppColors.brand),
+                   onPressed: _transcribing ? null : () => _toggleMic(context),
                  ),
               ),
             ),

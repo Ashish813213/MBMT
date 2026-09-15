@@ -98,6 +98,7 @@ class FavouritesScreen extends StatelessWidget {
       backgroundColor: AppColors.pageBg,
       appBar: AppBar(title: const Text('Favourite Journeys')),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'favourites-add-fab',
         onPressed: () => _add(context, s),
         backgroundColor: AppColors.brand,
         icon: const Icon(Icons.add_rounded),

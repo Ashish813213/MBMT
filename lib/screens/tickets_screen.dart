@@ -29,6 +29,7 @@ class TicketsScreen extends StatelessWidget {
       floatingActionButton: seg == 2
           ? null
           : FloatingActionButton.extended(
+              heroTag: 'tickets-buy-fab',
               onPressed: () => pushPage(context, const BuyTicketScreen()),
               backgroundColor: AppColors.brand,
               icon: const Icon(Icons.add_rounded),

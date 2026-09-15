@@ -9,12 +9,21 @@ environment:
   sdk: ">=3.3.0 <4.0.0"
   flutter: ">=3.19.0"
 
-# No third-party packages are used. Everything is built on the Flutter SDK
-# (Material 3, CustomPainter, ChangeNotifier, InheritedNotifier, Navigator).
-# This keeps the project buildable offline with just `flutter pub get`.
+# The app itself is built on the Flutter SDK (Material 3, CustomPainter,
+# ChangeNotifier, InheritedNotifier, Navigator). Three small, widely-used
+# packages power the optional "MBMT Assistant" AI feature:
+#   http           - calls the OpenAI Chat Completions / Whisper REST APIs
+#   record         - microphone recording for voice input
+#   path_provider  - a writable temp path for the recorded audio file
+# The app runs perfectly well without an API key configured (the assistant
+# screens degrade to a friendly "not configured" message) - only these three
+# packages need `flutter pub get` to resolve, everything else is offline.
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.2.0
+  record: ^7.0.0
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
