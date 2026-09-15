@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/bus_stops.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../nav.dart';
@@ -9,7 +10,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/crowd_indicator.dart';
-import '../widgets/mini_map.dart';
+import '../widgets/real_map.dart';
 import '../widgets/status_badge.dart';
 import 'buy_ticket_screen.dart';
 
@@ -54,11 +55,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   int get _nextStopIndex {
-    final int n = _bus.stops.length;
+    final int n = _routeStops.length;
+    if (n == 0) return 0;
     return (_progress * (n - 1)).ceil().clamp(0, n - 1);
   }
 
   double get _distanceKm => (_bus.distanceKm * (_eta / _initialEta)).clamp(0.1, _bus.distanceKm);
+
+  /// Ordered real stops of this route, resolved from the collected table.
+  /// Names without coordinates are skipped so the map never breaks.
+  List<RealStop> get _routeStops => <RealStop>[
+        for (final String name in _bus.stops)
+          if (stopByName(name) != null) stopByName(name)!,
+      ];
 
   /// Upcoming scheduled departures from the route origin, spaced by the
   /// route headway and aligned to the next headway slot.
@@ -81,7 +90,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final AppState s = AppScope.of(context);
     final bool fav = s.isFavouriteRoute(_bus.number);
     final int etaShown = _eta.round();
-    final String nextStop = _bus.stops[_nextStopIndex];
+    final String nextStop = _routeStops.isEmpty
+        ? _bus.stops.first
+        : _routeStops[_nextStopIndex].name;
     final bool animate = !MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
@@ -162,11 +173,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
           ),
           const SizedBox(height: 14),
 
-          MiniMap(
-            stopCount: _bus.stops.length,
+          RealMap(
+            stops: _routeStops,
             progress: _progress,
             userIndex: _nextStopIndex,
-            animate: animate,
           ),
           const SizedBox(height: 14),
 
@@ -238,7 +248,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
           const SizedBox(height: 16),
 
           const SectionHeader(title: 'Upcoming stops'),
-          _StopsTimeline(stops: _bus.stops, nextIndex: _nextStopIndex),
+          _StopsTimeline(
+            stops: _routeStops.map((RealStop stop) => stop.name).toList(),
+            nextIndex: _nextStopIndex,
+          ),
           const SizedBox(height: 18),
 
           const SectionHeader(title: 'Travel actions'),

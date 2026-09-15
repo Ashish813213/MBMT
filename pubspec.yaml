@@ -24,6 +24,10 @@ dependencies:
   http: ^1.2.0
   record: ^7.0.0
   path_provider: ^2.1.0
+  # Real Leaflet-based map (OpenStreetMap tiles) for live bus tracking,
+  # replacing the offline CustomPainter placeholder.
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.0
 
 dev_dependencies:
   flutter_test:

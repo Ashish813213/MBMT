@@ -336,7 +336,7 @@ class TicketDraft {
     this.date = 'Today',
     this.count = 1,
     this.fare = 25,
-    this.route = '45A',
+    this.route = '29',
     this.vehicleNo = 'MH 04 LA 1234',
   });
 

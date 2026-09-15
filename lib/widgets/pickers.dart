@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
+import '../data/bus_stops.dart';
 import '../theme/app_theme.dart';
 
-/// Bottom-sheet stop picker with a live filter. Returns the chosen stop name.
-Future<String?> pickStop(BuildContext context, {required String title, String? current}) {
+/// Bottom-sheet stop picker over the collected stop table, grouped by area.
+/// Outside-MBMC termini stay hidden unless the user opts in.
+/// Returns the chosen stop name.
+Future<String?> pickStop(BuildContext context,
+    {required String title, String? current, bool includeOutside = false}) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: AppColors.surface,
-    builder: (BuildContext ctx) => _StopPickerSheet(title: title, current: current),
+    builder: (BuildContext ctx) => _StopPickerSheet(
+        title: title, current: current, includeOutside: includeOutside),
   );
 }
 
 class _StopPickerSheet extends StatefulWidget {
-  const _StopPickerSheet({required this.title, this.current});
+  const _StopPickerSheet(
+      {required this.title, this.current, this.includeOutside = false});
   final String title;
   final String? current;
+  final bool includeOutside;
 
   @override
   State<_StopPickerSheet> createState() => _StopPickerSheetState();
@@ -25,11 +31,18 @@ class _StopPickerSheet extends StatefulWidget {
 
 class _StopPickerSheetState extends State<_StopPickerSheet> {
   String _q = '';
+  late bool _showOutside = widget.includeOutside;
 
   @override
   Widget build(BuildContext context) {
-    final List<String> stops = MockData.stops
-        .where((String s) => s.toLowerCase().contains(_q.toLowerCase()))
+    final String q = _q.toLowerCase();
+    final List<RealStop> stops = kRealStops
+        .where((RealStop s) =>
+            (s.isOutside ? _showOutside : true) &&
+            (q.isEmpty ||
+                s.name.toLowerCase().contains(q) ||
+                s.area.toLowerCase().contains(q) ||
+                s.buses.any((String b) => b.toLowerCase().contains(q))))
         .toList();
     final MediaQueryData mq = MediaQuery.of(context);
     final double insets = mq.viewInsets.bottom;
@@ -60,24 +73,59 @@ class _StopPickerSheetState extends State<_StopPickerSheet> {
                 autofocus: true,
                 onChanged: (String v) => setState(() => _q = v),
                 decoration: const InputDecoration(
-                  hintText: 'Search stops',
+                  hintText: 'Search stops, areas or bus numbers',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilterChip(
+                  label: const Text('Thane / Borivali / Manori halts'),
+                  selected: _showOutside,
+                  onSelected: (bool v) => setState(() => _showOutside = v),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('${stops.length} stops',
+                    style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w600)),
               ),
             ),
             Expanded(
               child: ListView.builder(
                 itemCount: stops.length,
                 itemBuilder: (BuildContext context, int i) {
-                  final String stop = stops[i];
-                  final bool sel = stop == widget.current;
+                  final RealStop stop = stops[i];
+                  final bool sel = stop.name == widget.current;
                   return ListTile(
                     leading: Icon(
                       sel ? Icons.radio_button_checked_rounded : Icons.location_on_outlined,
                       color: sel ? AppColors.brand : AppColors.muted,
                     ),
-                    title: Text(stop, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    onTap: () => Navigator.pop(context, stop),
+                    title: Text(stop.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      '${stop.area} · Buses ${stop.buses.join(', ')}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: stop.isOutside
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.warnSoft,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text('Outside',
+                                style: TextStyle(
+                                    fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.warn)),
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(context, stop.name),
                   );
                 },
               ),

@@ -5,6 +5,9 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bus_card.dart';
 
+/// Track a bus across all official MBMT routes collected from OSM +
+/// the MBMC route network. Search matches route numbers, destinations,
+/// via areas and any halt on the route.
 class TrackBusScreen extends StatefulWidget {
   const TrackBusScreen({super.key, this.embedded = false});
 
@@ -20,13 +23,15 @@ class _TrackBusScreenState extends State<TrackBusScreen> {
   @override
   Widget build(BuildContext context) {
     final String q = _q.trim().toLowerCase();
+    final List<Bus> all = MockData.nearbyBuses;
     final List<Bus> buses = q.isEmpty
-        ? MockData.nearbyBuses
-        : MockData.nearbyBuses
+        ? all
+        : all
             .where((Bus b) =>
                 b.number.toLowerCase().contains(q) ||
                 b.destination.toLowerCase().contains(q) ||
-                b.via.toLowerCase().contains(q))
+                b.via.toLowerCase().contains(q) ||
+                b.stops.any((String s) => s.toLowerCase().contains(q)))
             .toList();
 
     return Scaffold(
@@ -42,7 +47,7 @@ class _TrackBusScreenState extends State<TrackBusScreen> {
             child: TextField(
               onChanged: (String v) => setState(() => _q = v),
               decoration: const InputDecoration(
-                hintText: 'Search bus number or destination',
+                hintText: 'Search bus number, destination or stop',
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
@@ -56,12 +61,15 @@ class _TrackBusScreenState extends State<TrackBusScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
                     children: <Widget>[
-                      const Row(
+                      Row(
                         children: <Widget>[
-                          Icon(Icons.my_location_rounded, size: 15, color: AppColors.brand),
-                          SizedBox(width: 6),
-                          Text('Live buses near you',
-                              style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600)),
+                          const Icon(Icons.my_location_rounded, size: 15, color: AppColors.brand),
+                          const SizedBox(width: 6),
+                          Text(
+                              q.isEmpty
+                                  ? '${all.length} official routes · live buses near you'
+                                  : '${buses.length} of ${all.length} routes match',
+                              style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600)),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -70,7 +78,7 @@ class _TrackBusScreenState extends State<TrackBusScreen> {
                             child: BusCard(bus: b, showStatus: true),
                           )),
                       const SizedBox(height: 6),
-                      Center(
+                      const Center(
                         child: Text('Tap a bus to follow it live on the map',
                             style: TextStyle(fontSize: 11.5, color: AppColors.muted)),
                       ),

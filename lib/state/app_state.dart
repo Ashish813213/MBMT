@@ -153,11 +153,12 @@ class AppState extends ChangeNotifier {
 
   // --- Journey planner (driven from AppState so tab + deep links share it) --
   String plannerFrom = 'Mira Road Station (E)';
-  String plannerTo = 'Thane Station';
+  String plannerTo = 'Thane Station (E) Kopri';
   String plannerWhen = 'Now';
   bool plannerShowResults = false;
 
   void setPlanner({String? from, String? to, String? when, bool? showResults}) {
+    if (from != null || to != null) selectedRoute = null;
     plannerFrom = from ?? plannerFrom;
     plannerTo = to ?? plannerTo;
     plannerWhen = when ?? plannerWhen;
@@ -169,12 +170,14 @@ class AppState extends ChangeNotifier {
     final String t = plannerFrom;
     plannerFrom = plannerTo;
     plannerTo = t;
+    selectedRoute = null;
     plannerShowResults = false;
     notifyListeners();
   }
 
   /// Deep-link into the Journey tab with a from/to pre-filled.
   void openPlanner(String from, String to, {bool auto = true}) {
+    selectedRoute = null;
     plannerFrom = from;
     plannerTo = to;
     plannerShowResults = auto;
@@ -204,7 +207,7 @@ class AppState extends ChangeNotifier {
   // --- Ticket draft ----------------------------------------------
   TicketDraft ticketDraft = const TicketDraft(
     from: 'Mira Road Station (E)',
-    to: 'Thane Station',
+    to: 'Thane Station (E) Kopri',
   );
   void setTicketDraft(TicketDraft draft) {
     ticketDraft = draft;

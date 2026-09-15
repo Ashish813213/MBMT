@@ -22,7 +22,11 @@ void main() {
     await tester.pumpWidget(const MbmtApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Buy Ticket').first);
+    final Finder buyTicket = find.text('Buy Ticket').first;
+    await tester.ensureVisible(buyTicket);
+    await tester.pumpAndSettle();
+
+    await tester.tap(buyTicket);
     await tester.pumpAndSettle();
 
     expect(find.text('Proceed to Pay  ·  ₹25'), findsOneWidget);

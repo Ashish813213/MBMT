@@ -20,6 +20,7 @@ class JourneyPlannerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppState s = AppScope.of(context);
     final RouteOption? selected = s.selectedRoute;
+    final List<RouteOption> routes = MockData.routeOptionsFor(s.plannerFrom, s.plannerTo);
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
@@ -47,23 +48,32 @@ class JourneyPlannerScreen extends StatelessWidget {
                 const Text('Best options',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 const Spacer(),
-                Text('${MockData.routeOptions.length} routes',
+                Text('${routes.length} routes',
                     style: const TextStyle(fontSize: 12, color: AppColors.muted)),
               ],
             ),
             const SizedBox(height: 6),
-            const Align(alignment: Alignment.centerLeft, child: CrowdLegend()),
-            const SizedBox(height: 12),
-            ...MockData.routeOptions.map(
-              (RouteOption r) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: RouteCard(
-                  route: r,
-                  selected: selected?.id == r.id,
-                  onSelect: () => s.selectRoute(r),
+            if (routes.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 22),
+                child: Center(
+                  child: Text('No direct bus route found for these stops.'),
+                ),
+              )
+            else ...<Widget>[
+              const Align(alignment: Alignment.centerLeft, child: CrowdLegend()),
+              const SizedBox(height: 12),
+              ...routes.map(
+                (RouteOption r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: RouteCard(
+                    route: r,
+                    selected: selected?.id == r.id,
+                    onSelect: () => s.selectRoute(r),
+                  ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 4),
             Center(
               child: Text(

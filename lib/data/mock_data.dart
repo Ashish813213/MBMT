@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import 'bus_stops.dart';
+import 'real_routes.dart';
 
-/// Demo content for the MBMT Smart Bus prototype.
+/// App content: real collected stop/route data (see `bus_stops.dart` and
+/// `real_routes.dart`) plus presentation-only sample content (passes,
+/// ticket history, notifications).
 ///
-/// Place names, stations and corridors below are the *real* Mira-Bhayandar /
-/// Ghodbunder Road / Thane geography that MBMT serves. Route numbers, ETAs,
-/// fares, crowd levels and timetables are realistic sample values for a
-/// project presentation - this is a *proposed redesigned* MBMT app and none of
-/// the data reflects a live schedule.
+/// Place names and coordinates come from 52 unique OSM `highway=bus_stop`
+/// nodes merged with the official MBMC route network (86 in-zone stops +
+/// Outside-MBMC termini). Timetable values are the MBMC portal's published
+/// first/last trips; ETAs, crowd levels and fares are realistic samples for
+/// a project presentation - not a live schedule.
 class MockData {
   MockData._();
 
@@ -24,269 +28,170 @@ class MockData {
   ];
 
   /// Master list of MBMT stops / stations across the network. Used by the
-  /// search index and the From / To pickers.
-  static const List<String> stops = <String>[
-    // Mira Road
-    'Mira Road Station (E)',
-    'Mira Road Station (W)',
-    'Shanti Nagar (Mira Road)',
-    'Silver Park',
-    'Sheetal Nagar',
-    'Hatkesh',
-    'Kanakia',
-    'Sai Baba Nagar',
-    'Naya Nagar',
-    'Ramdev Park',
-    'Poonam Sagar',
-    'Beverly Park',
-    // Kashimira / highway
-    'Kashimira Junction',
-    'Kashigaon',
-    'Dahisar Check Naka',
-    'Dahisar Station (E)',
-    // Bhayandar
-    'Bhayandar Station (E)',
-    'Bhayandar Station (W)',
-    'Jesal Park',
-    '150 Feet Road',
-    'Golden Nest Circle',
-    'Maxus Mall',
-    'Navghar Road',
-    'Indralok',
-    'Rai Morva',
-    'Chowk',
-    'Dongri',
-    'Uttan',
-    'Pali Beach',
-    'Maghatane',
-    // Ghodbunder Road -> Thane
-    'Ghodbunder Road',
-    'Anand Nagar (Ghodbunder)',
-    'Waghbil',
-    'Hiranandani Estate',
-    'Patlipada',
-    'Manpada',
-    'Kapurbawdi Junction',
-    'Teen Haath Naka',
-    'Thane Station',
-  ];
+  /// search index and the From / To pickers. Backed by the collected
+  /// `kRealStops` table (includes Outside-MBMC termini so Thane / Andheri /
+  /// Borivali routes resolve; UI filters them behind an opt-in toggle).
+  static List<String> get stops => kAllStopNames;
 
-  static const List<Bus> nearbyBuses = <Bus>[
-    Bus(
-      number: '45A',
-      destination: 'Thane Station',
-      via: 'Ghodbunder Road',
-      etaMin: 6,
-      fare: 25,
-      crowd: Crowd.medium,
-      status: BusStatus.arriving,
-      vehicleNo: 'MH 04 LA 1234',
-      distanceKm: 2.1,
-      stops: <String>[
-        'Mira Road Station (E)',
-        'Kashimira Junction',
-        'Ghodbunder Road',
-        'Patlipada',
-        'Thane Station',
-      ],
-      nextStopIndex: 1,
-      headwayMin: 12,
-      firstBus: '05:40',
-      lastBus: '22:45',
-      depot: 'Mira Road Depot',
-      runningTimeMin: 38,
-    ),
-    Bus(
-      number: '20',
-      destination: 'Mira Road Station (E)',
-      via: 'Bhayandar',
-      etaMin: 11,
-      fare: 20,
-      crowd: Crowd.low,
-      status: BusStatus.onTime,
-      vehicleNo: 'MH 04 KT 8890',
-      distanceKm: 3.4,
-      stops: <String>[
-        'Bhayandar Station (E)',
-        'Jesal Park',
-        '150 Feet Road',
-        'Shanti Nagar (Mira Road)',
-        'Mira Road Station (E)',
-      ],
-      nextStopIndex: 1,
-      headwayMin: 10,
-      firstBus: '05:30',
-      lastBus: '23:15',
-      depot: 'Bhayandar Depot',
-      runningTimeMin: 26,
-    ),
-    Bus(
-      number: '12',
-      destination: 'Bhayandar Station (E)',
-      via: 'Kanakia',
-      etaMin: 18,
-      fare: 22,
-      crowd: Crowd.medium,
-      status: BusStatus.onTime,
-      vehicleNo: 'MH 04 JB 4521',
-      distanceKm: 5.0,
-      stops: <String>[
-        'Mira Road Station (E)',
-        'Sheetal Nagar',
-        'Kanakia',
-        'Silver Park',
-        'Golden Nest Circle',
-        'Bhayandar Station (E)',
-      ],
-      nextStopIndex: 2,
-      headwayMin: 15,
-      firstBus: '06:00',
-      lastBus: '22:30',
-      depot: 'Mira Road Depot',
-      runningTimeMin: 34,
-    ),
-    Bus(
-      number: '1',
-      destination: 'Uttan',
-      via: 'Chowk',
-      etaMin: 24,
-      fare: 18,
-      crowd: Crowd.high,
-      status: BusStatus.delayed,
-      vehicleNo: 'MH 04 GF 2276',
-      distanceKm: 6.7,
-      stops: <String>[
-        'Bhayandar Station (W)',
-        'Maxus Mall',
-        'Rai Morva',
-        'Chowk',
-        'Dongri',
-        'Uttan',
-      ],
-      nextStopIndex: 1,
-      headwayMin: 20,
-      firstBus: '06:15',
-      lastBus: '21:40',
-      depot: 'Uttan Depot',
-      runningTimeMin: 32,
-    ),
-    Bus(
-      number: '6',
-      destination: 'Bhayandar Station (E)',
-      via: '150 Feet Road',
-      etaMin: 9,
-      fare: 15,
-      crowd: Crowd.medium,
-      status: BusStatus.onTime,
-      vehicleNo: 'MH 04 CT 3390',
-      distanceKm: 1.6,
-      stops: <String>[
-        'Mira Road Station (E)',
-        'Hatkesh',
-        'Kanakia',
-        'Kashigaon',
-        'Golden Nest Circle',
-        '150 Feet Road',
-        'Jesal Park',
-        'Bhayandar Station (E)',
-      ],
-      nextStopIndex: 2,
-      headwayMin: 8,
-      firstBus: '05:20',
-      lastBus: '23:30',
-      depot: 'Mira Road Depot',
-      runningTimeMin: 30,
-    ),
-    Bus(
-      number: '7',
-      destination: 'Dahisar Check Naka',
-      via: 'Kashimira',
-      etaMin: 14,
-      fare: 15,
-      crowd: Crowd.low,
-      status: BusStatus.onTime,
-      vehicleNo: 'MH 04 DL 7712',
-      distanceKm: 4.2,
-      stops: <String>[
-        'Mira Road Station (E)',
-        'Sai Baba Nagar',
-        'Kanakia',
-        'Kashimira Junction',
-        'Dahisar Check Naka',
-      ],
-      nextStopIndex: 1,
-      headwayMin: 12,
-      firstBus: '05:45',
-      lastBus: '23:00',
-      depot: 'Mira Road Depot',
-      runningTimeMin: 22,
-    ),
-  ];
+  /// Stops inside the MBMC zone (Outside-MBMC termini excluded). Used by
+  /// search and pickers by default.
+  static List<String> get zoneStops => kZoneStopNames;
+
+  static List<Bus> get nearbyBuses => kRealBuses;
 
   static int fareForRoute(String routeNumber) {
     try {
-      return nearbyBuses.firstWhere((Bus b) => b.number == routeNumber).fare;
+      return kRealBuses
+          .firstWhere(
+              (Bus b) => b.number.toLowerCase() == routeNumber.toLowerCase())
+          .fare;
     } catch (_) {
       return 25;
     }
   }
 
   static String busNumberForStops(String from, String to) {
-    for (final Bus b in nearbyBuses) {
-      if (b.stops.contains(from) && b.stops.contains(to)) {
+    for (final Bus b in kRealBuses) {
+      final int fromIndex = _stopIndex(b.stops, from);
+      final int toIndex = _stopIndex(b.stops, to);
+      if (fromIndex >= 0 && toIndex > fromIndex) {
         return b.number;
       }
     }
-    return nearbyBuses.first.number;
+    return kRealBuses.first.number;
   }
 
+  /// Returns only buses whose published stop sequence actually travels from
+  /// [from] to [to] in that order. This keeps the planner and tracking screen
+  /// on the same real route instead of showing presentation-only suggestions.
+  static List<RouteOption> routeOptionsFor(String from, String to) {
+    final List<_RouteMatch> matches = <_RouteMatch>[];
+    for (final Bus bus in kRealBuses) {
+      final int fromIndex = _stopIndex(bus.stops, from);
+      final int toIndex = _stopIndex(bus.stops, to);
+      if (fromIndex < 0 || toIndex <= fromIndex) continue;
+
+      final int legs = toIndex - fromIndex;
+      final int routeLegs = bus.stops.length > 1 ? bus.stops.length - 1 : 1;
+      final int estimatedDuration =
+          (bus.runningTimeMin * legs / routeLegs).round();
+      final int estimatedFare = (bus.fare * legs / routeLegs).round();
+      matches.add(_RouteMatch(
+        bus: bus,
+        durationMin: estimatedDuration < 3 ? 3 : estimatedDuration,
+        fare: estimatedFare < 10 ? 10 : estimatedFare,
+      ));
+    }
+
+    matches.sort((a, b) => a.durationMin.compareTo(b.durationMin));
+    final List<_RouteMatch> distinct = <_RouteMatch>[];
+    final Set<String> numbers = <String>{};
+    for (final _RouteMatch match in matches) {
+      if (numbers.add(match.bus.number)) distinct.add(match);
+    }
+
+    final List<_RouteMatch> cheapest = List<_RouteMatch>.from(distinct)
+      ..sort((a, b) => a.fare.compareTo(b.fare));
+    final List<_RouteMatch> leastCrowded = List<_RouteMatch>.from(distinct)
+      ..sort((a, b) => _crowdRank(a.bus.crowd).compareTo(_crowdRank(b.bus.crowd)));
+
+    return distinct.take(3).map((_RouteMatch match) {
+      String tag = 'recommended';
+      if (match.bus.number == distinct.first.bus.number) {
+        tag = 'fastest';
+      } else if (cheapest.isNotEmpty && match.bus.number == cheapest.first.bus.number) {
+        tag = 'cheapest';
+      } else if (leastCrowded.isNotEmpty && match.bus.number == leastCrowded.first.bus.number) {
+        tag = 'less-crowded';
+      }
+      return RouteOption(
+        id: 'real-${match.bus.number}-${_stopIndex(match.bus.stops, from)}-${_stopIndex(match.bus.stops, to)}',
+        tag: tag,
+        busNumber: match.bus.number,
+        durationMin: match.durationMin,
+        fare: match.fare,
+        arrivingInMin: match.bus.etaMin,
+        crowd: match.bus.crowd,
+        via: match.bus.via,
+        headwayMin: match.bus.headwayMin,
+        firstBus: match.bus.firstBus,
+        lastBus: match.bus.lastBus,
+      );
+    }).toList();
+  }
+
+  static int _stopIndex(List<String> stops, String requested) {
+    final String q = requested.trim().toLowerCase();
+    return stops.indexWhere((String stop) => stop.trim().toLowerCase() == q);
+  }
+
+  static int _crowdRank(Crowd crowd) {
+    switch (crowd) {
+      case Crowd.low:
+        return 0;
+      case Crowd.medium:
+        return 1;
+      case Crowd.high:
+        return 2;
+    }
+  }
+
+  /// Resolves a route number to its [Bus], following legacy dummy aliases
+  /// (`45A` -> `29`, `7` -> `14`) so old favourites and links keep working.
   static Bus busByNumber(String number) {
-    return nearbyBuses.firstWhere(
-      (Bus b) => b.number.toLowerCase() == number.toLowerCase(),
-      orElse: () => nearbyBuses.first,
+    final String q = number.trim().toLowerCase();
+    final String resolved = kLegacyBusAliases[q.toUpperCase()] ?? number;
+    final String rq = resolved.toLowerCase();
+    return kRealBuses.firstWhere(
+      (Bus b) => b.number.toLowerCase() == rq,
+      orElse: () => kRealBuses.firstWhere(
+        (Bus b) => b.number.toLowerCase() == q,
+        orElse: () => kRealBuses.first,
+      ),
     );
   }
 
-  /// Journey Planner recommendations for Mira Road Station (E) -> Thane Station.
+  /// Journey Planner recommendations for Mira Road Station (E) ->
+  /// Thane Station (E) Kopri.
   static const List<RouteOption> routeOptions = <RouteOption>[
     RouteOption(
-      id: 'r-45A',
+      id: 'r-29',
       tag: 'fastest',
-      busNumber: '45A',
-      durationMin: 38,
-      fare: 25,
+      busNumber: '29',
+      durationMin: 52,
+      fare: 30,
       arrivingInMin: 6,
       crowd: Crowd.medium,
-      via: 'Ghodbunder Road',
+      via: 'Kashimira & S.K. Stone',
       headwayMin: 12,
-      firstBus: '05:40',
-      lastBus: '22:45',
+      firstBus: '05:45',
+      lastBus: '20:15',
     ),
     RouteOption(
-      id: 'r-20',
+      id: 'r-10',
       tag: 'cheapest',
-      busNumber: '20',
-      durationMin: 45,
-      fare: 20,
-      arrivingInMin: 11,
-      crowd: Crowd.low,
-      via: 'Bhayandar & 150 Feet Road',
-      headwayMin: 10,
-      firstBus: '05:30',
-      lastBus: '23:15',
+      busNumber: '10',
+      durationMin: 70,
+      fare: 25,
+      arrivingInMin: 12,
+      crowd: Crowd.high,
+      via: 'Bhayandar & Ghodbunder Road',
+      headwayMin: 15,
+      firstBus: '05:45',
+      lastBus: '19:30',
     ),
     RouteOption(
-      id: 'r-12',
+      id: 'r-29AC',
       tag: 'less-crowded',
-      busNumber: '12',
-      durationMin: 42,
-      fare: 22,
-      arrivingInMin: 18,
+      busNumber: '29AC',
+      durationMin: 48,
+      fare: 50,
+      arrivingInMin: 8,
       crowd: Crowd.low,
-      via: 'Kanakia & Golden Nest',
-      headwayMin: 15,
-      firstBus: '06:00',
-      lastBus: '22:30',
+      via: 'Kashimira (AC Express)',
+      headwayMin: 35,
+      firstBus: '07:25',
+      lastBus: '18:55',
     ),
   ];
 
@@ -294,10 +199,10 @@ class MockData {
     ServiceUpdate(
       id: 'su1',
       type: UpdateType.diversion,
-      route: 'Route 45A',
-      title: 'Route 45A diversion near Ghodbunder Road',
+      route: 'Route 29',
+      title: 'Route 29 diversion near S.K. Stone',
       body:
-          'Diversion near Anand Nagar on Ghodbunder Road due to traffic. Buses run via '
+          'Diversion near S.K. Stone on Mira-Ghodbunder Road due to traffic. Buses run via '
           'Kashigaon and rejoin the route at Kashimira Junction.',
       ago: '10 min ago',
       severity: UpdateSeverity.warning,
@@ -305,11 +210,11 @@ class MockData {
     ServiceUpdate(
       id: 'su2',
       type: UpdateType.delay,
-      route: 'Route 20',
-      title: 'Route 20 running late',
+      route: 'Route 12',
+      title: 'Route 12 running late',
       body:
-          'Delay of 15-20 minutes between Bhayandar Station and 150 Feet Road due to road '
-          'repair work near Jesal Park.',
+          'Delay of 15-20 minutes between Bhayandar Station and Golden Nest Circle due to road '
+          'repair work near Ghoddev Naka.',
       ago: '25 min ago',
       severity: UpdateSeverity.warning,
     ),
@@ -327,10 +232,10 @@ class MockData {
     ServiceUpdate(
       id: 'su4',
       type: UpdateType.cancellation,
-      route: 'Route 7',
+      route: 'Route 14',
       title: 'Late-night trip cancelled today',
       body:
-          'The 22:00 trip on Route 7 from Mira Road Station (E) to Dahisar Check Naka is '
+          'The 20:00 trip on Route 14 from Bhayandar Station (E) to Borivali National Park is '
           'cancelled today for scheduled vehicle maintenance.',
       ago: '2 hr ago',
       severity: UpdateSeverity.critical,
@@ -347,32 +252,37 @@ class MockData {
   ];
 
   static const List<FrequentJourney> frequentJourneys = <FrequentJourney>[
-     FrequentJourney(
-       id: 'fj1',
-       from: 'Mira Road Station (E)',
-       to: 'Thane Station',
-       nextBusMin: 8,
-       busNumber: '45A',
-     ),
-     FrequentJourney(
-       id: 'fj2',
-       from: 'Mira Road Station (E)',
-       to: 'Bhayandar Station (E)',
-       nextBusMin: 13,
-       busNumber: '20',
-     ),
-   ];
+    FrequentJourney(
+      id: 'fj1',
+      from: 'Mira Road Station (E)',
+      to: 'Thane Station (E) Kopri',
+      nextBusMin: 8,
+      busNumber: '29',
+    ),
+    FrequentJourney(
+      id: 'fj2',
+      from: 'Mira Road Station (E)',
+      to: 'Bhayandar Station (E)',
+      nextBusMin: 13,
+      busNumber: '26',
+    ),
+  ];
 
-  static const List<String> recentSearches = <String>['Thane Station', 'Bhayandar Station (E)', '45A'];
+  static const List<String> recentSearches = <String>[
+    'Kashimira Junction',
+    'Bhayandar Station (E)',
+    '29'
+  ];
 
   static const List<SearchResult> suggestedDestinations = <SearchResult>[
-    SearchResult(title: 'Thane Station', subtitle: 'Railway station - via Ghodbunder Road', kind: SearchKind.destination),
+    SearchResult(title: 'Thane Station (E) Kopri', subtitle: 'Railway station - via Kashimira & S.K. Stone', kind: SearchKind.destination),
     SearchResult(title: 'Bhayandar Station (E)', subtitle: 'Railway station - 5 km', kind: SearchKind.destination),
     SearchResult(title: 'Mira Road Station (W)', subtitle: 'Railway station - 2 km', kind: SearchKind.destination),
     SearchResult(title: 'Golden Nest Circle', subtitle: 'Junction - Bhayandar East', kind: SearchKind.stop),
     SearchResult(title: 'Dahisar Check Naka', subtitle: 'Highway stop - Mumbai border', kind: SearchKind.stop),
     SearchResult(title: 'Maxus Mall', subtitle: 'Landmark - Bhayandar West', kind: SearchKind.destination),
-    SearchResult(title: 'Uttan', subtitle: 'Coastal terminus - Route 1', kind: SearchKind.destination),
+    SearchResult(title: 'Uttan Naka', subtitle: 'Coastal terminus - Routes 2, 6', kind: SearchKind.destination),
+    SearchResult(title: 'Kashimira Junction', subtitle: 'Junction - Routes 5, 14, 25, 29', kind: SearchKind.stop),
   ];
 
   static const List<TransitPass> passes = <TransitPass>[
@@ -427,8 +337,8 @@ class MockData {
     ),
     Ticket(
       id: 'TKT230788110',
-      from: 'Bhayandar Station (E)',
-      to: 'Mira Road Station (E)',
+      from: 'Bhayandar Station (W)',
+      to: 'Rai Morva / Morva Bhat',
       route: '20',
       fare: 20,
       date: '27 Aug 2026',
@@ -440,9 +350,9 @@ class MockData {
     Ticket(
       id: 'TKT230744902',
       from: 'Mira Road Station (E)',
-      to: 'Thane Station',
-      route: '45A',
-      fare: 25,
+      to: 'Thane Station (E) Kopri',
+      route: '29',
+      fare: 30,
       date: '24 Aug 2026',
       time: '10:15 AM',
       status: 'completed',
@@ -452,9 +362,9 @@ class MockData {
     Ticket(
       id: 'TKT230701255',
       from: 'Kashimira Junction',
-      to: 'Thane Station',
-      route: '45A',
-      fare: 20,
+      to: 'Thane Station (E) Kopri',
+      route: '29',
+      fare: 30,
       date: '21 Aug 2026',
       time: '8:30 AM',
       status: 'expired',
@@ -468,16 +378,16 @@ class MockData {
           id: 'n1',
           icon: Icons.warning_amber_rounded,
           tint: Color(0xFFF97316),
-          title: 'Route 45A diversion',
-          body: 'Diversion near Ghodbunder Road (Anand Nagar) due to traffic.',
+          title: 'Route 29 diversion',
+          body: 'Diversion near S.K. Stone on Mira-Ghodbunder Road due to traffic.',
           ago: '10 min ago',
         ),
         const AppNotification(
           id: 'n2',
           icon: Icons.directions_bus_rounded,
           tint: Color(0xFF0B8F55),
-          title: 'Bus 45A arriving soon',
-          body: 'Your bus to Thane Station is about 6 min from Mira Road Station (E).',
+          title: 'Bus 29 arriving soon',
+          body: 'Your bus to Thane Station (E) Kopri is about 6 min from Mira Road Station (E).',
           ago: '12 min ago',
         ),
         const AppNotification(
@@ -506,4 +416,16 @@ class MockData {
     'हिन्दी': 'hi',
     'मराठी': 'mr',
   };
+}
+
+class _RouteMatch {
+  const _RouteMatch({
+    required this.bus,
+    required this.durationMin,
+    required this.fare,
+  });
+
+  final Bus bus;
+  final int durationMin;
+  final int fare;
 }

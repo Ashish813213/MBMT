@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/bus_stops.dart';
 import '../data/mock_data.dart';
+import '../data/real_routes.dart';
 import '../models/models.dart';
 import '../nav.dart';
 import '../services/voice_input_service.dart';
@@ -8,8 +10,10 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'tracking_screen.dart';
 
-/// Smart search: destinations, bus stops, bus numbers, route numbers.
-/// The user never needs to know a route number to get a result.
+/// Smart search over the collected stop table: destinations, bus stops with
+/// their real halt buses, bus numbers and route numbers.
+/// Outside-MBMC termini (Thane / Borivali / Manori) stay hidden unless the
+/// user opts in. The user never needs to know a route number to get a result.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -17,18 +21,30 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
+String _srcLabel(String src) {
+  switch (src) {
+    case 'osm':
+      return 'OSM exact';
+    case 'osm+curated':
+      return 'OSM verified';
+    default:
+      return 'approx';
+  }
+}
+
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
   bool _recording = false;
   bool _transcribing = false;
+  bool _includeOutside = false;
 
   static const List<String> _examples = <String>[
-    'Thane Station',
-    'Mira Road Station',
-    'Bhayandar',
-    '45A',
-    'Ghodbunder Road',
+    'Kashimira Junction',
+    'Bhayandar Station (E)',
+    'Uttan Naka',
+    '29',
+    'Ghodbunder Depot',
   ];
 
   @override
@@ -56,14 +72,14 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _recording = false;
         _transcribing = false;
-        if (text != null && text!.isNotEmpty) {
-          _controller.text = text!;
-          _query = text!;
+        if (text != null && text.isNotEmpty) {
+          _controller.text = text;
+          _query = text;
         }
       });
       if (failure != null) {
         showToast(context, failure, icon: Icons.error_outline_rounded);
-      } else if (text == null || text!.isEmpty) {
+      } else if (text == null || text.isEmpty) {
         showToast(context, 'Could not hear anything - try again', icon: Icons.mic_off_rounded);
       }
       return;
@@ -79,6 +95,17 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  bool _isBusQuery(String q) {
+    final String v = q.trim().toUpperCase();
+    if (kLegacyBusAliases.containsKey(v)) return true;
+    return kRealBuses.any((Bus b) => b.number.toLowerCase() == q.trim().toLowerCase());
+  }
+
+  String _resolveBusNumber(String q) {
+    final String v = q.trim().toUpperCase();
+    return kLegacyBusAliases[v] ?? q.trim();
+  }
+
   List<SearchResult> get _results {
     final String q = _query.trim().toLowerCase();
     if (q.isEmpty) return const <SearchResult>[];
@@ -89,7 +116,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (b.number.toLowerCase().contains(q)) {
         out.add(SearchResult(
           title: 'Bus ${b.number}',
-          subtitle: 'To ${b.destination} · via ${b.via}',
+          subtitle: 'To ${b.destination} · via ${b.via} · ${b.stops.length} stops',
           kind: SearchKind.bus,
         ));
       }
@@ -97,10 +124,20 @@ class _SearchScreenState extends State<SearchScreen> {
     for (final SearchResult d in MockData.suggestedDestinations) {
       if (d.title.toLowerCase().contains(q)) out.add(d);
     }
-    for (final String stop in MockData.stops) {
-      final bool already = out.any((SearchResult r) => r.title.toLowerCase() == stop.toLowerCase());
-      if (!already && stop.toLowerCase().contains(q)) {
-        out.add(SearchResult(title: stop, subtitle: 'Bus stop', kind: SearchKind.stop));
+    for (final RealStop s in kRealStops) {
+      if (s.isOutside && !_includeOutside) continue;
+      final bool already = out.any((SearchResult r) => r.title.toLowerCase() == s.name.toLowerCase());
+      if (already) continue;
+      final bool hit = s.name.toLowerCase().contains(q) ||
+          s.area.toLowerCase().contains(q) ||
+          s.buses.any((String b) => b.toLowerCase().contains(q));
+      if (hit) {
+        final String zone = s.isOutside ? 'Outside zone · ${s.area}' : s.area;
+        out.add(SearchResult(
+          title: s.name,
+          subtitle: 'Buses ${s.buses.join(', ')} · $zone · ${_srcLabel(s.src)}',
+          kind: SearchKind.stop,
+        ));
       }
     }
     return out;
@@ -111,7 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
     s.addRecentSearch(r.kind == SearchKind.bus ? r.title.replaceFirst('Bus ', '') : r.title);
 
     if (r.kind == SearchKind.bus) {
-       final String number = r.title.replaceFirst('Bus ', '').trim();
+       final String number = _resolveBusNumber(r.title.replaceFirst('Bus ', '').trim());
        pushReplacementPage(context, TrackingScreen(busNumber: number));
      } else {
        s.openPlanner(s.originStop, r.title);
@@ -119,16 +156,14 @@ class _SearchScreenState extends State<SearchScreen> {
      }
    }
 
-   void _chooseRaw(BuildContext context, String value) {
+  void _chooseRaw(BuildContext context, String value) {
     final AppState s = AppScope.of(context);
     s.addRecentSearch(value);
-    final List<Bus> matches = MockData.nearbyBuses
-        .where((Bus b) => b.number.toLowerCase() == value.toLowerCase())
-        .toList();
-    if (matches.isNotEmpty) {
-      pushReplacementPage(context, TrackingScreen(busNumber: matches.first.number));
+    if (_isBusQuery(value)) {
+      pushReplacementPage(context, TrackingScreen(busNumber: _resolveBusNumber(value)));
     } else {
-      s.openPlanner(s.originStop, value);
+      final RealStop? exact = stopByName(value);
+      s.openPlanner(s.originStop, exact?.name ?? value);
       Navigator.of(context).pop();
     }
   }
@@ -180,67 +215,85 @@ suffixIcon: IconButton(
             ),
           ),
         ),
-      body: results.isNotEmpty
-          ? ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              itemCount: results.length,
-              separatorBuilder: (BuildContext _, int __) => const Divider(height: 1, indent: 60),
-              itemBuilder: (BuildContext context, int i) => _ResultTile(
-                result: results[i],
-                onTap: () => _choose(context, results[i]),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      body: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
               children: <Widget>[
-                _Header('Try'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _examples
-                      .map((String e) => ActionChip(
-                            label: Text(e),
-                            onPressed: () => _chooseRaw(context, e),
-                          ))
-                      .toList(),
-                ),
-                const SizedBox(height: 20),
-                if (s.recentSearches.isNotEmpty) ...<Widget>[
-                  Row(
-                    children: <Widget>[
-                      _Header('Recent searches'),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: s.clearRecentSearches,
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text('Clear'),
-                      ),
-                    ],
-                  ),
-                  ...s.recentSearches.map(
-                    (String q) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.history_rounded, color: AppColors.muted),
-                      title: Text(q, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                      trailing: const Icon(Icons.north_west_rounded, size: 16, color: AppColors.muted),
-                      onTap: () => _chooseRaw(context, q),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-                _Header('Suggested destinations'),
-                ...MockData.suggestedDestinations.map(
-                  (SearchResult d) => _ResultTile(
-                    result: d,
-                    onTap: () => _choose(context, d),
-                  ),
+                FilterChip(
+                  label: const Text('Thane / Borivali / Manori halts'),
+                  selected: _includeOutside,
+                  onSelected: (bool v) => setState(() => _includeOutside = v),
                 ),
               ],
             ),
+          ),
+          Expanded(
+            child: results.isNotEmpty
+                ? ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    itemCount: results.length,
+                    separatorBuilder: (BuildContext _, int __) => const Divider(height: 1, indent: 60),
+                    itemBuilder: (BuildContext context, int i) => _ResultTile(
+                      result: results[i],
+                      onTap: () => _choose(context, results[i]),
+                    ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    children: <Widget>[
+                      _Header('Try'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _examples
+                            .map((String e) => ActionChip(
+                                  label: Text(e),
+                                  onPressed: () => _chooseRaw(context, e),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 20),
+                      if (s.recentSearches.isNotEmpty) ...<Widget>[
+                        Row(
+                          children: <Widget>[
+                            _Header('Recent searches'),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: s.clearRecentSearches,
+                              style: TextButton.styleFrom(
+                                minimumSize: Size.zero,
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Clear'),
+                            ),
+                          ],
+                        ),
+                        ...s.recentSearches.map(
+                          (String q) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.history_rounded, color: AppColors.muted),
+                            title: Text(q, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                            trailing: const Icon(Icons.north_west_rounded, size: 16, color: AppColors.muted),
+                            onTap: () => _chooseRaw(context, q),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      _Header('Suggested destinations'),
+                      ...MockData.suggestedDestinations.map(
+                        (SearchResult d) => _ResultTile(
+                          result: d,
+                          onTap: () => _choose(context, d),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -292,4 +345,3 @@ IconData get _icon {
     );
   }
 }
-
