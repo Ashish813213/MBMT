@@ -1,12 +1,18 @@
+import 'dart:math';
+
+import '../data/bus_stops.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../models/trip_models.dart';
+import 'geo_utils.dart';
 
 /// A small, deterministic, pure-Dart trip planner over the MBMT bus network
 /// described in [MockData]. No AI is involved in computing the route itself -
 /// this graph search finds real bus numbers, real stop names and prorated
 /// fares/durations from the app's own data, and falls back to a clearly
-/// labelled estimated auto-rickshaw leg when no bus path is known.
+/// labelled estimated walking or auto-rickshaw leg when no bus path is known,
+/// choosing between the two by the real straight-line distance between the
+/// two stops' collected GPS coordinates (see `bus_stops.dart`).
 ///
 /// The AI assistant calls [plan] as a tool and only explains the result in
 /// natural language - it never invents a bus number or stop on its own.
@@ -19,7 +25,7 @@ class TripPlanner {
     final String destination = _resolveStop(rawDestination);
 
     if (origin.isEmpty || destination.isEmpty) {
-      return _rickshawFallback(
+      return _smartFallback(
         origin.isEmpty ? rawOrigin.trim() : origin,
         destination.isEmpty ? rawDestination.trim() : destination,
       );
@@ -33,13 +39,81 @@ class TripPlanner {
         totalDurationMin: 0,
         totalFare: 0,
         isEstimate: false,
+        mode: TravelMode.bus,
       );
     }
 
     if (!_isKnownStop(origin) || !_isKnownStop(destination)) {
-      return _rickshawFallback(origin, destination);
+      return _smartFallback(origin, destination);
     }
 
+    final TripItinerary? bus = _findBusItinerary(origin, destination);
+    if (bus != null) return bus;
+
+    // Nothing found within one transfer in this prototype's network.
+    return _smartFallback(origin, destination);
+  }
+
+  /// Every realistic way to make this trip, Google-Maps-style: a bus/transit
+  /// option when one exists within one transfer, plus an auto-rickshaw and a
+  /// walking option, each computed independently with its own time and fare
+  /// so the caller can show them side by side and let the user pick - rather
+  /// than [plan]'s single best pick. Always returns at least one option.
+  List<TripItinerary> planModes(String rawOrigin, String rawDestination) {
+    final String origin = _resolveStop(rawOrigin);
+    final String destination = _resolveStop(rawDestination);
+
+    if (origin.isEmpty || destination.isEmpty) {
+      return <TripItinerary>[
+        _smartFallback(
+          origin.isEmpty ? rawOrigin.trim() : origin,
+          destination.isEmpty ? rawDestination.trim() : destination,
+        ),
+      ];
+    }
+
+    if (origin.toLowerCase() == destination.toLowerCase()) {
+      return <TripItinerary>[
+        TripItinerary(
+          originResolved: origin,
+          destinationResolved: destination,
+          legs: const <TripLeg>[],
+          totalDurationMin: 0,
+          totalFare: 0,
+          isEstimate: false,
+          mode: TravelMode.bus,
+        ),
+      ];
+    }
+
+    if (!_isKnownStop(origin) || !_isKnownStop(destination)) {
+      return <TripItinerary>[_smartFallback(origin, destination)];
+    }
+
+    final List<TripItinerary> options = <TripItinerary>[];
+
+    final TripItinerary? bus = _findBusItinerary(origin, destination);
+    if (bus != null) options.add(bus);
+
+    final RealStop? oStop = stopByName(origin);
+    final RealStop? dStop = stopByName(destination);
+    if (oStop != null && dStop != null) {
+      final double km = _haversineKm(oStop, dStop);
+      options.add(_rickshawFallback(origin, destination, km));
+      options.add(_walkFallback(origin, destination, km));
+    }
+
+    if (options.isEmpty) options.add(_smartFallback(origin, destination));
+
+    options.sort((TripItinerary a, TripItinerary b) =>
+        a.totalDurationMin.compareTo(b.totalDurationMin));
+    return options;
+  }
+
+  /// Steps 1 and 2 of [plan]/[planModes]: a direct single-bus route, else the
+  /// fastest one-transfer route, else `null` if neither exists in this
+  /// prototype's network.
+  TripItinerary? _findBusItinerary(String origin, String destination) {
     // 1) A single bus that passes through both, in the right order.
     for (final Bus b in MockData.nearbyBuses) {
       final int i = _indexOfStop(b.stops, origin);
@@ -78,10 +152,7 @@ class TripPlanner {
         }
       }
     }
-    if (best != null) return best;
-
-    // 3) Nothing found within one transfer in this prototype's network.
-    return _rickshawFallback(origin, destination);
+    return best;
   }
 
   // --- stop resolution ------------------------------------------------------
@@ -159,6 +230,7 @@ class TripPlanner {
       totalDurationMin: duration,
       totalFare: fare,
       isEstimate: false,
+      mode: TravelMode.bus,
     );
   }
 
@@ -226,12 +298,83 @@ class TripPlanner {
       totalDurationMin: aDuration + walkDuration + bDuration,
       totalFare: aFare + bFare,
       isEstimate: false,
+      mode: TravelMode.bus,
     );
   }
 
-  TripItinerary _rickshawFallback(String origin, String destination) {
+  // --- no-bus-route fallback: search around by real distance -----------------
+
+  /// Average how far most people will comfortably walk instead of waiting
+  /// for a bus and changing.
+  static const double _walkableKm = 1.2;
+
+  /// When no bus route (direct or one-transfer) connects [origin] and
+  /// [destination], "search around" using the two stops' real collected GPS
+  /// coordinates: short straight-line distances become a walking leg, longer
+  /// ones become an auto-rickshaw leg with a distance-based time/fare
+  /// estimate instead of one fixed guess for every trip.
+  TripItinerary _smartFallback(String origin, String destination) {
     final String o = origin.isEmpty ? 'your location' : origin;
     final String d = destination.isEmpty ? 'that destination' : destination;
+
+    final RealStop? oStop = stopByName(o);
+    final RealStop? dStop = stopByName(d);
+    final double? distanceKm =
+        (oStop != null && dStop != null) ? _haversineKm(oStop, dStop) : null;
+
+    if (distanceKm != null && distanceKm <= _walkableKm) {
+      return _walkFallback(o, d, distanceKm);
+    }
+    return _rickshawFallback(o, d, distanceKm);
+  }
+
+  TripItinerary _walkFallback(String o, String d, double distanceKm) {
+    final int duration = max(4, (distanceKm / 4.5 * 60).round());
+    final String distanceLabel = distanceKm < 1
+        ? '${(distanceKm * 1000).round()} m'
+        : '${distanceKm.toStringAsFixed(1)} km';
+    final String note = distanceKm <= _walkableKm
+        ? 'they are close ($distanceLabel straight-line) - walking is quicker than waiting for a '
+            'bus and changing'
+        : 'it is a longer walk ($distanceLabel straight-line, about $duration min) - a fine option '
+            'if you do not mind the distance, otherwise compare it with the other modes';
+    return TripItinerary(
+      originResolved: o,
+      destinationResolved: d,
+      legs: <TripLeg>[
+        TripLeg(
+          mode: TravelMode.walk,
+          from: o,
+          to: d,
+          durationMin: duration,
+          fare: 0,
+          instruction:
+              'No MBMT bus route within one change is known between $o and $d in this prototype, '
+              'but $note.',
+        ),
+      ],
+      totalDurationMin: duration,
+      totalFare: 0,
+      isEstimate: true,
+      mode: TravelMode.walk,
+    );
+  }
+
+  TripItinerary _rickshawFallback(String o, String d, double? distanceKm) {
+    // Fall back to a generic short-hop guess only when a stop's coordinates
+    // are not on file (e.g. a place name typed in that isn't a known stop).
+    final double km = distanceKm ?? 4.0;
+    final int duration = max(6, (km / 18 * 60).round());
+    final int fare = max(25, (26 + (km > 1.5 ? (km - 1.5) * 17 : 0)).round());
+    final String distanceNote = distanceKm == null
+        ? 'this duration and fare are a rough estimate, not a live quote'
+        : km > 10
+            ? 'based on a straight-line distance of about ${km.toStringAsFixed(1)} km - that is a '
+                'long way for an auto-rickshaw, so a local train or another MBMT route with a '
+                'second change may be faster in reality'
+            : 'based on a straight-line distance of about ${km.toStringAsFixed(1)} km - actual road '
+                'distance and traffic will change the real time and fare';
+
     return TripItinerary(
       originResolved: o,
       destinationResolved: d,
@@ -240,17 +383,19 @@ class TripPlanner {
           mode: TravelMode.rickshaw,
           from: o,
           to: d,
-          durationMin: 18,
-          fare: 70,
+          durationMin: duration,
+          fare: fare,
           instruction:
               'No MBMT bus route within one change is known between $o and $d in this prototype. '
-              'An auto-rickshaw is suggested instead - this duration and fare are a rough estimate, '
-              'not a live quote.',
+              'An auto-rickshaw is suggested instead - $distanceNote.',
         ),
       ],
-      totalDurationMin: 18,
-      totalFare: 70,
+      totalDurationMin: duration,
+      totalFare: fare,
       isEstimate: true,
+      mode: TravelMode.rickshaw,
     );
   }
+
+  double _haversineKm(RealStop a, RealStop b) => haversineKm(a.lat, a.lng, b.lat, b.lng);
 }

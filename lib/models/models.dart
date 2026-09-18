@@ -243,6 +243,22 @@ class FrequentJourney {
     required this.nextBusMin,
     required this.busNumber,
   });
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'from': from,
+        'to': to,
+        'next_bus_min': nextBusMin,
+        'bus_number': busNumber,
+      };
+
+  factory FrequentJourney.fromJson(Map<String, dynamic> json) => FrequentJourney(
+        id: json['id'] as String,
+        from: json['from'] as String,
+        to: json['to'] as String,
+        nextBusMin: json['next_bus_min'] as int,
+        busNumber: json['bus_number'] as String,
+      );
 }
 
 class AppNotification {
@@ -319,6 +335,32 @@ class Ticket {
     required this.passengers,
     required this.vehicleNo,
   });
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'from': from,
+        'to': to,
+        'route': route,
+        'fare': fare,
+        'date': date,
+        'time': time,
+        'status': status,
+        'passengers': passengers,
+        'vehicle_no': vehicleNo,
+      };
+
+  factory Ticket.fromJson(Map<String, dynamic> json) => Ticket(
+        id: json['id'] as String,
+        from: json['from'] as String,
+        to: json['to'] as String,
+        route: json['route'] as String,
+        fare: json['fare'] as int,
+        date: json['date'] as String,
+        time: json['time'] as String,
+        status: json['status'] as String,
+        passengers: json['passengers'] as String,
+        vehicleNo: json['vehicle_no'] as String,
+      );
 }
 
 class TicketDraft {

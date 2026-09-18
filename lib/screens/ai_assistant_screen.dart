@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/mock_data.dart';
 import '../models/ai_chat_message.dart';
+import '../models/models.dart';
 import '../nav.dart';
 import '../services/ai_service.dart';
 import '../services/trip_agent.dart';
@@ -8,11 +10,13 @@ import '../services/voice_input_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/itinerary_card.dart';
+import 'active_ticket_screen.dart';
 
 /// "MBMT Assistant" - greets the user, asks where they want to go, then plans
 /// a real door-to-door MBMT trip (bus legs, transfers, walking, and an
-/// auto-rickshaw fallback when no route is known) using [TripAgent]. Supports
-/// typed or spoken input and replies in the app's selected language.
+/// auto-rickshaw fallback when no route is known) using [TripAgent], and can
+/// book a real digital ticket once the user confirms. Supports typed or
+/// spoken input and replies in the app's selected language.
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
 
@@ -35,8 +39,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   static const List<String> _suggestedPrompts = <String>[
     'How do I get to Thane Station?',
     'Fare from Bhayandar to Mira Road',
+    'Book me a ticket to Bhayandar Station',
     'Which bus goes to Uttan?',
-    'Where can I buy a monthly pass?',
   ];
 
   @override
@@ -65,6 +69,31 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     return _messages.sublist(_messages.length - maxTurns);
   }
 
+  /// Issues a real ticket via [AppState], exactly like the manual Buy Ticket
+  /// -> Payment flow but skipping the payment step (this prototype already
+  /// simulates payment everywhere else too). Called by [TripAgent] once the
+  /// model has confirmed a direct, single-bus trip with the user.
+  Ticket _issueBookedTicket(
+    AppState s, {
+    required String from,
+    required String to,
+    required String busNumber,
+    required int fare,
+    required int passengers,
+  }) {
+    final Bus bus = MockData.busByNumber(busNumber);
+    final TicketDraft draft = TicketDraft(
+      from: from,
+      to: to,
+      route: busNumber,
+      fare: fare,
+      count: passengers,
+      vehicleNo: bus.vehicleNo,
+    );
+    s.setTicketDraft(draft);
+    return s.issueTicket(draft);
+  }
+
   Future<void> _send(String text) async {
     final String q = text.trim();
     if (q.isEmpty || _sending) return;
@@ -86,13 +115,29 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         userMessage: q,
         languageCode: s.language,
         currentLocationStop: s.originStop,
+        onBookTicket: ({
+          required String from,
+          required String to,
+          required String busNumber,
+          required int fare,
+          required int passengers,
+        }) =>
+            _issueBookedTicket(
+          s,
+          from: from,
+          to: to,
+          busNumber: busNumber,
+          fare: fare,
+          passengers: passengers,
+        ),
       );
       if (!mounted) return;
       setState(() {
         _messages.add(AiChatMessage(
           role: AiRole.assistant,
           content: result.reply,
-          itinerary: result.itinerary,
+          itineraries: result.itineraries,
+          ticket: result.ticket,
         ));
         _sending = false;
       });
@@ -274,11 +319,18 @@ class _MessageBlock extends StatelessWidget {
         crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: <Widget>[
           _Bubble(isUser: isUser, text: message.content),
-          if (message.itinerary != null) ...<Widget>[
+          if (message.itineraries != null && message.itineraries!.isNotEmpty) ...<Widget>[
             const SizedBox(height: 8),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
-              child: ItineraryCard(itinerary: message.itinerary!),
+              child: TripModeSelector(options: message.itineraries!),
+            ),
+          ],
+          if (message.ticket != null) ...<Widget>[
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
+              child: _TicketConfirmationCard(ticket: message.ticket!),
             ),
           ],
         ],
@@ -310,6 +362,62 @@ class _Bubble extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(fontSize: 13.5, height: 1.4, color: isUser ? Colors.white : AppColors.ink),
+      ),
+    );
+  }
+}
+
+class _TicketConfirmationCard extends StatelessWidget {
+  const _TicketConfirmationCard({required this.ticket});
+  final Ticket ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.liveSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.live.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.live700),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Ticket booked',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.live700)),
+              ),
+              Text('₹${ticket.fare}',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.live700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${ticket.from} → ${ticket.to}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Bus ${ticket.route} · ${ticket.passengers} · ${ticket.id}',
+            style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => pushPage(context, ActiveTicketScreen(ticket: ticket)),
+              icon: const Icon(Icons.confirmation_number_rounded, size: 16),
+              label: const Text('View Ticket'),
+            ),
+          ),
+        ],
       ),
     );
   }

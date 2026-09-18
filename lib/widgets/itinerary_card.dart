@@ -3,6 +3,135 @@ import 'package:flutter/material.dart';
 import '../models/trip_models.dart';
 import '../theme/app_theme.dart';
 
+/// Google-Maps-style mode picker for the [TripItinerary] options
+/// [TripPlanner.planModes] returns for one trip - a row of tappable chips
+/// (Bus / Auto-rickshaw / Walk, each with its own time and fare), with the
+/// full step-by-step [ItineraryCard] for whichever chip is selected shown
+/// underneath. Falls back to a single plain [ItineraryCard] when there is
+/// only one option to show.
+class TripModeSelector extends StatefulWidget {
+  const TripModeSelector({super.key, required this.options});
+
+  final List<TripItinerary> options;
+
+  @override
+  State<TripModeSelector> createState() => _TripModeSelectorState();
+}
+
+class _TripModeSelectorState extends State<TripModeSelector> {
+  int _selected = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.options.isEmpty) return const SizedBox.shrink();
+    if (widget.options.length == 1) {
+      return ItineraryCard(itinerary: widget.options.first);
+    }
+
+    final int selected = _selected < widget.options.length ? _selected : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(
+          height: 56,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: widget.options.length,
+            separatorBuilder: (BuildContext _, int __) => const SizedBox(width: 8),
+            itemBuilder: (BuildContext context, int i) {
+              final TripItinerary o = widget.options[i];
+              return _ModeChip(
+                itinerary: o,
+                selected: i == selected,
+                onTap: () => setState(() => _selected = i),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        ItineraryCard(itinerary: widget.options[selected]),
+      ],
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({required this.itinerary, required this.selected, required this.onTap});
+
+  final TripItinerary itinerary;
+  final bool selected;
+  final VoidCallback onTap;
+
+  IconData get _icon {
+    switch (itinerary.mode) {
+      case TravelMode.bus:
+        return Icons.directions_bus_rounded;
+      case TravelMode.walk:
+        return Icons.directions_walk_rounded;
+      case TravelMode.rickshaw:
+        return Icons.local_taxi_rounded;
+    }
+  }
+
+  String get _label {
+    switch (itinerary.mode) {
+      case TravelMode.bus:
+        return 'Bus';
+      case TravelMode.walk:
+        return 'Walk';
+      case TravelMode.rickshaw:
+        return 'Auto';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fg = selected ? Colors.white : AppColors.ink;
+    return Material(
+      color: selected ? AppColors.brand : AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? Colors.transparent : AppColors.line),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(_icon, size: 15, color: selected ? Colors.white : AppColors.brand),
+                  const SizedBox(width: 5),
+                  Text(_label,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: fg)),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${itinerary.totalDurationMin} min · '
+                '${itinerary.totalFare > 0 ? '₹${itinerary.totalFare}' : 'Free'}',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white.withOpacity(0.9) : AppColors.inkSoft,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Renders a computed [TripItinerary] as a step-by-step timeline - which bus
 /// to board, where to change, and where to walk - mirroring the visual
 /// language of the live-tracking stops list elsewhere in the app.

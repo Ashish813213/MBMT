@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../data/bus_stops.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../nav.dart';
+import '../services/geo_utils.dart';
+import '../services/location_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_drawer.dart';
@@ -18,8 +23,55 @@ import 'buy_ticket_screen.dart';
 import 'favourites_screen.dart';
 import 'service_updates_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Bus> _nearbyBuses = MockData.nearbyBuses.take(3).toList();
+  String? _nearestStopLabel;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadNearbyByRealLocation());
+  }
+
+  /// Tries to replace the sample "Buses Near You" list with buses that
+  /// actually serve the stop(s) nearest the device's real GPS position -
+  /// falls back to (and leaves untouched) the sample list above on any
+  /// permission/GPS failure, exactly like the SOS screen's location handling.
+  Future<void> _loadNearbyByRealLocation() async {
+    final LocationResult loc = await LocationService.instance.getCurrentLocation();
+    if (!mounted || !loc.hasCoordinates || kRealStops.isEmpty) return;
+
+    final List<RealStop> byDistance = List<RealStop>.from(kRealStops)
+      ..sort((RealStop a, RealStop b) => haversineKm(loc.latitude!, loc.longitude!, a.lat, a.lng)
+          .compareTo(haversineKm(loc.latitude!, loc.longitude!, b.lat, b.lng)));
+
+    final RealStop nearest = byDistance.first;
+    final double distanceKm = haversineKm(loc.latitude!, loc.longitude!, nearest.lat, nearest.lng);
+
+    final List<Bus> buses = <Bus>[];
+    final Set<String> seen = <String>{};
+    for (final RealStop stop in byDistance) {
+      for (final String number in stop.buses) {
+        if (seen.add(number)) buses.add(MockData.busByNumber(number));
+      }
+      if (buses.length >= 3) break;
+    }
+    if (buses.isEmpty || !mounted) return;
+
+    setState(() {
+      _nearbyBuses = buses.take(3).toList();
+      _nearestStopLabel = distanceKm < 1
+          ? 'Near ${nearest.name} · ${(distanceKm * 1000).round()} m away'
+          : 'Near ${nearest.name} · ${distanceKm.toStringAsFixed(1)} km away';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,10 +120,25 @@ class HomeScreen extends StatelessWidget {
                     actionLabel: s.t('view_all'),
                     onAction: () => s.setTab(3),
                   ),
-                  ...List<Widget>.generate(3, (int i) {
-                    final Bus bus = MockData.nearbyBuses[i];
+                  if (_nearestStopLabel != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: <Widget>[
+                          const Icon(Icons.my_location_rounded, size: 13, color: AppColors.brand),
+                          const SizedBox(width: 4),
+                          Text(_nearestStopLabel!,
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.inkSoft,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ...List<Widget>.generate(_nearbyBuses.length, (int i) {
+                    final Bus bus = _nearbyBuses[i];
                     return Padding(
-                      padding: EdgeInsets.only(bottom: i == 2 ? 0 : 10),
+                      padding: EdgeInsets.only(bottom: i == _nearbyBuses.length - 1 ? 0 : 10),
                       child: BusCard(bus: bus, showStatus: i == 0),
                     );
                   }),

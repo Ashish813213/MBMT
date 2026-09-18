@@ -50,6 +50,13 @@ class TripItinerary {
   /// estimated walk / auto-rickshaw leg instead of a real bus leg.
   final bool isEstimate;
 
+  /// The headline transport mode this option represents - lets the UI show
+  /// a maps-style mode picker (Bus / Auto-rickshaw / Walk) across several
+  /// [TripItinerary]s for the same origin/destination. A bus itinerary may
+  /// still include a short walking connector leg for a transfer; its
+  /// headline mode stays [TravelMode.bus].
+  final TravelMode mode;
+
   const TripItinerary({
     required this.originResolved,
     required this.destinationResolved,
@@ -57,6 +64,7 @@ class TripItinerary {
     required this.totalDurationMin,
     required this.totalFare,
     required this.isEstimate,
+    required this.mode,
   });
 
   bool get isSamePlace => legs.isEmpty;
@@ -66,6 +74,7 @@ class TripItinerary {
       : 0;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
+        'mode': mode.name,
         'origin': originResolved,
         'destination': destinationResolved,
         'total_duration_min': totalDurationMin,

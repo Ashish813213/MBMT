@@ -1,16 +1,40 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../data/mock_data.dart';
 import '../i18n/strings.dart';
+import '../models/departure_reminder.dart';
+import '../models/emergency_contact.dart';
 import '../models/models.dart';
+import '../services/storage_service.dart';
 
 /// Single source of truth for the whole prototype.
 ///
 /// Deliberately plain: a [ChangeNotifier] surfaced through an
 /// [InheritedNotifier] ([AppScope]). No external state-management package.
+/// Tickets, favourites, emergency contacts, departure reminders and settings
+/// are mirrored to on-device storage (see [loadPersisted] / [StorageService])
+/// so a demo survives an app restart; everything still works, just reset to
+/// sample defaults, if that load hasn't run yet or storage is unavailable.
 class AppState extends ChangeNotifier {
+  // --- Persistence keys -------------------------------------------------
+  static const String _kLanguage = 'mbmt.language';
+  static const String _kLargeText = 'mbmt.largeText';
+  static const String _kHighContrast = 'mbmt.highContrast';
+  static const String _kReduceMotion = 'mbmt.reduceMotion';
+  static const String _kSimpleLanguage = 'mbmt.simpleLanguage';
+  static const String _kPushAlerts = 'mbmt.pushAlerts';
+  static const String _kServiceAlerts = 'mbmt.serviceAlerts';
+  static const String _kFavourites = 'mbmt.favourites';
+  static const String _kFavouriteRoutes = 'mbmt.favouriteRoutes';
+  static const String _kTickets = 'mbmt.tickets';
+  static const String _kRecentSearches = 'mbmt.recentSearches';
+  static const String _kEmergencyContacts = 'mbmt.emergencyContacts';
+  static const String _kDepartureReminders = 'mbmt.departureReminders';
   // --- Bottom navigation -----------------------------------------------------
   int _tabIndex = 0;
   int get tabIndex => _tabIndex;
@@ -44,6 +68,7 @@ class AppState extends ChangeNotifier {
   set language(String code) {
     _language = code;
     notifyListeners();
+    unawaited(StorageService.instance.setString(_kLanguage, _language));
   }
 
   bool largeText = false;
@@ -68,6 +93,17 @@ class AppState extends ChangeNotifier {
     this.pushAlerts = pushAlerts ?? this.pushAlerts;
     this.serviceAlerts = serviceAlerts ?? this.serviceAlerts;
     notifyListeners();
+    unawaited(_persistSettings());
+  }
+
+  Future<void> _persistSettings() async {
+    final StorageService store = StorageService.instance;
+    await store.setBool(_kLargeText, largeText);
+    await store.setBool(_kHighContrast, highContrast);
+    await store.setBool(_kReduceMotion, reduceMotion);
+    await store.setBool(_kSimpleLanguage, simpleLanguage);
+    await store.setBool(_kPushAlerts, pushAlerts);
+    await store.setBool(_kServiceAlerts, serviceAlerts);
   }
 
   /// Translation helper. `t('view_all')`.
@@ -92,12 +128,19 @@ class AppState extends ChangeNotifier {
       ),
     );
     notifyListeners();
+    unawaited(_persistFavourites());
   }
 
   void removeFavourite(String id) {
     _favourites.removeWhere((FrequentJourney j) => j.id == id);
     notifyListeners();
+    unawaited(_persistFavourites());
   }
+
+  Future<void> _persistFavourites() => StorageService.instance.setStringList(
+        _kFavourites,
+        _favourites.map((FrequentJourney j) => jsonEncode(j.toJson())).toList(),
+      );
 
   // --- Favourite routes (from the tracking screen) ---------------------
   final Set<String> _favouriteRoutes = <String>{};
@@ -107,6 +150,7 @@ class AppState extends ChangeNotifier {
       _favouriteRoutes.remove(number);
     }
     notifyListeners();
+    unawaited(StorageService.instance.setStringList(_kFavouriteRoutes, _favouriteRoutes.toList()));
   }
 
   // --- Notifications ----------------------------------------------------
@@ -148,8 +192,14 @@ class AppState extends ChangeNotifier {
     );
     _tickets.insert(0, ticket);
     notifyListeners();
+    unawaited(_persistTickets());
     return ticket;
   }
+
+  Future<void> _persistTickets() => StorageService.instance.setStringList(
+        _kTickets,
+        _tickets.map((Ticket t) => jsonEncode(t.toJson())).toList(),
+      );
 
   // --- Journey planner (driven from AppState so tab + deep links share it) --
   String plannerFrom = 'Mira Road Station (E)';
@@ -227,11 +277,198 @@ class AppState extends ChangeNotifier {
       _recentSearches.removeRange(6, _recentSearches.length);
     }
     notifyListeners();
+    unawaited(StorageService.instance.setStringList(_kRecentSearches, _recentSearches));
   }
 
   void clearRecentSearches() {
     _recentSearches.clear();
     notifyListeners();
+    unawaited(StorageService.instance.setStringList(_kRecentSearches, _recentSearches));
+  }
+
+  // --- Emergency contacts (SOS screen) --------------------------
+  final List<EmergencyContact> _emergencyContacts = <EmergencyContact>[];
+  List<EmergencyContact> get emergencyContacts =>
+      List<EmergencyContact>.unmodifiable(_emergencyContacts);
+
+  void addEmergencyContact(String name, String phone) {
+    _emergencyContacts.add(
+      EmergencyContact(id: 'ec${DateTime.now().microsecondsSinceEpoch}', name: name, phone: phone),
+    );
+    notifyListeners();
+    unawaited(_persistEmergencyContacts());
+  }
+
+  void removeEmergencyContact(String id) {
+    _emergencyContacts.removeWhere((EmergencyContact c) => c.id == id);
+    notifyListeners();
+    unawaited(_persistEmergencyContacts());
+  }
+
+  Future<void> _persistEmergencyContacts() => StorageService.instance.setStringList(
+        _kEmergencyContacts,
+        _emergencyContacts.map((EmergencyContact c) => jsonEncode(c.toJson())).toList(),
+      );
+
+  // --- Departure reminders ("leave now for your bus") ---------------------
+  //
+  // Distinct from the live-tracking screen's TravelAlert (which fires while
+  // riding, close to your stop): this fires `leadMinutes` before a daily
+  // boarding time, so you don't miss the bus before you've even left. It is
+  // an in-app reminder checked on a foreground timer, not an OS push
+  // notification - see [startReminderClock] for why.
+  final List<DepartureReminder> _departureReminders = <DepartureReminder>[];
+  List<DepartureReminder> get departureReminders =>
+      List<DepartureReminder>.unmodifiable(_departureReminders);
+
+  void addDepartureReminder(DepartureReminder reminder) {
+    _departureReminders.add(reminder);
+    notifyListeners();
+    unawaited(_persistDepartureReminders());
+  }
+
+  void removeDepartureReminder(String id) {
+    _departureReminders.removeWhere((DepartureReminder r) => r.id == id);
+    _firedToday.removeWhere((String key) => key.startsWith('$id|'));
+    notifyListeners();
+    unawaited(_persistDepartureReminders());
+  }
+
+  void setDepartureReminderEnabled(String id, bool enabled) {
+    final int i = _departureReminders.indexWhere((DepartureReminder r) => r.id == id);
+    if (i == -1) return;
+    _departureReminders[i] = _departureReminders[i].copyWith(enabled: enabled);
+    notifyListeners();
+    unawaited(_persistDepartureReminders());
+  }
+
+  Future<void> _persistDepartureReminders() => StorageService.instance.setStringList(
+        _kDepartureReminders,
+        _departureReminders.map((DepartureReminder r) => jsonEncode(r.toJson())).toList(),
+      );
+
+  Timer? _reminderTimer;
+  final Set<String> _firedToday = <String>{};
+  DepartureReminder? _pendingReminderAlert;
+
+  /// The reminder that just fired, if any - the UI shell shows an alert for
+  /// it, then calls [acknowledgeReminderAlert].
+  DepartureReminder? get pendingReminderAlert => _pendingReminderAlert;
+
+  void acknowledgeReminderAlert() {
+    _pendingReminderAlert = null;
+  }
+
+  /// Starts the foreground clock that checks departure reminders. Real OS
+  /// push notifications (`flutter_local_notifications` + scheduled exact
+  /// alarms) would fire even with the app closed, but that plugin's Android
+  /// 12+ exact-alarm and Android 13+ POST_NOTIFICATIONS permission handling
+  /// varies by OS version in ways that can't be verified without a real
+  /// build here - so this prototype checks reminders every 20s while the app
+  /// is open instead, using the same haptic+sound+dialog pattern already
+  /// proven on the live tracking screen's travel alert.
+  void startReminderClock() {
+    _checkReminders();
+    _reminderTimer ??= Timer.periodic(const Duration(seconds: 20), (_) => _checkReminders());
+  }
+
+  void _checkReminders() {
+    final DateTime now = DateTime.now();
+    final String todayKey = '${now.year}-${now.month}-${now.day}';
+
+    for (final DepartureReminder r in _departureReminders) {
+      if (!r.enabled) continue;
+      final String firedKey = '${r.id}|$todayKey';
+      if (_firedToday.contains(firedKey)) continue;
+
+      final DateTime target = DateTime(now.year, now.month, now.day, r.hour, r.minute);
+      final DateTime lead = target.subtract(Duration(minutes: r.leadMinutes));
+      if (now.isBefore(lead) || now.isAfter(target)) continue;
+
+      _firedToday.add(firedKey);
+      _pendingReminderAlert = r;
+      HapticFeedback.vibrate();
+      SystemSound.play(SystemSoundType.alert);
+      notifyListeners();
+      return; // one alert at a time is enough
+    }
+  }
+
+  // --- Load persisted state -----------------------------------------------
+
+  /// Reads everything persisted by [StorageService] back into memory,
+  /// overwriting the sample defaults this object was constructed with. Runs
+  /// once, fired-and-forgotten from `_MbmtAppState.initState`, so the app
+  /// renders instantly with sample data and then updates itself the moment
+  /// real on-device data is available (usually a few ms later).
+  Future<void> loadPersisted() async {
+    final StorageService store = StorageService.instance;
+
+    final String? lang = await store.getString(_kLanguage);
+    if (lang != null) _language = lang;
+
+    largeText = await store.getBool(_kLargeText) ?? largeText;
+    highContrast = await store.getBool(_kHighContrast) ?? highContrast;
+    reduceMotion = await store.getBool(_kReduceMotion) ?? reduceMotion;
+    simpleLanguage = await store.getBool(_kSimpleLanguage) ?? simpleLanguage;
+    pushAlerts = await store.getBool(_kPushAlerts) ?? pushAlerts;
+    serviceAlerts = await store.getBool(_kServiceAlerts) ?? serviceAlerts;
+
+    await _loadListIfPresent(_kFavourites, (List<String> raw) {
+      _favourites
+        ..clear()
+        ..addAll(raw.map(
+            (String r) => FrequentJourney.fromJson(jsonDecode(r) as Map<String, dynamic>)));
+    });
+    await _loadListIfPresent(_kTickets, (List<String> raw) {
+      _tickets
+        ..clear()
+        ..addAll(raw.map((String r) => Ticket.fromJson(jsonDecode(r) as Map<String, dynamic>)));
+    });
+    await _loadListIfPresent(_kEmergencyContacts, (List<String> raw) {
+      _emergencyContacts
+        ..clear()
+        ..addAll(raw.map(
+            (String r) => EmergencyContact.fromJson(jsonDecode(r) as Map<String, dynamic>)));
+    });
+    await _loadListIfPresent(_kDepartureReminders, (List<String> raw) {
+      _departureReminders
+        ..clear()
+        ..addAll(raw.map(
+            (String r) => DepartureReminder.fromJson(jsonDecode(r) as Map<String, dynamic>)));
+    });
+
+    final List<String> routes = await store.getStringList(_kFavouriteRoutes);
+    if (routes.isNotEmpty) {
+      _favouriteRoutes
+        ..clear()
+        ..addAll(routes);
+    }
+    final List<String> recents = await store.getStringList(_kRecentSearches);
+    if (recents.isNotEmpty) {
+      _recentSearches
+        ..clear()
+        ..addAll(recents);
+    }
+
+    notifyListeners();
+  }
+
+  /// Replaces the in-memory sample list for [key] via [apply], but only when
+  /// something was actually saved before - an absent key means "never
+  /// persisted yet", so the sample data already in memory (from this
+  /// object's field initialisers) is left as-is instead of being wiped to an
+  /// empty list.
+  Future<void> _loadListIfPresent(String key, void Function(List<String> raw) apply) async {
+    final List<String> raw = await StorageService.instance.getStringList(key);
+    if (raw.isEmpty) return;
+    apply(raw);
+  }
+
+  @override
+  void dispose() {
+    _reminderTimer?.cancel();
+    super.dispose();
   }
 
   // --- Formatting helpers -------------------------------------

@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/bus_stops.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import '../models/travel_alert.dart';
 import '../nav.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -13,6 +15,8 @@ import '../widgets/crowd_indicator.dart';
 import '../widgets/real_map.dart';
 import '../widgets/status_badge.dart';
 import 'buy_ticket_screen.dart';
+import 'sos_screen.dart';
+import 'travel_alert_screen.dart';
 
 /// Live bus tracking. Map-style view, route line, stops timeline, next stop and
 /// quick travel actions. ETA + position tick down while the screen is open.
@@ -31,6 +35,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   double _eta = 0;
   Timer? _timer;
 
+  TravelAlert? _alert;
+  bool _alertFired = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +47,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _timer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
       setState(() => _eta = (_eta - 0.4).clamp(1.0, _initialEta));
+      _checkAlert();
     });
   }
 
@@ -85,6 +93,76 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
   }
 
+  /// Fires [_fireAlert] the moment the tracked bus is within
+  /// [TravelAlert.stopsBefore] stops of the alert's target stop.
+  void _checkAlert() {
+    final TravelAlert? alert = _alert;
+    if (alert == null || _alertFired) return;
+
+    final List<RealStop> stops = _routeStops;
+    final int targetIndex =
+        stops.indexWhere((RealStop s) => s.name == alert.targetStopName);
+    if (targetIndex < 0) return;
+
+    final int stopsAway = targetIndex - _nextStopIndex;
+    if (stopsAway >= 0 && stopsAway <= alert.stopsBefore) {
+      _alertFired = true;
+      _fireAlert(alert, stopsAway);
+    }
+  }
+
+  void _fireAlert(TravelAlert alert, int stopsAway) {
+    if (alert.vibrate) HapticFeedback.vibrate();
+    if (alert.sound) SystemSound.play(SystemSoundType.alert);
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        icon: const Icon(Icons.notifications_active_rounded, color: AppColors.brand, size: 32),
+        title: const Text('Almost there!'),
+        content: Text(
+          stopsAway == 0
+              ? 'Bus ${_bus.number} is arriving at ${alert.targetStopName} now - get ready!'
+              : 'Bus ${_bus.number} is $stopsAway stop${stopsAway == 1 ? '' : 's'} away from '
+                  '${alert.targetStopName} - get ready!',
+        ),
+        actions: <Widget>[
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it')),
+        ],
+      ),
+    );
+  }
+
+  void _openAlertSetup() {
+    pushPage(
+      context,
+      TravelAlertScreen(
+        busNumber: _bus.number,
+        stops: _routeStops.map((RealStop s) => s.name).toList(),
+        initial: _alert,
+        onSave: (TravelAlert a) {
+          setState(() {
+            _alert = a;
+            _alertFired = false;
+          });
+          showToast(
+            context,
+            'Alert set: ${a.stopsBefore} stop${a.stopsBefore == 1 ? '' : 's'} before ${a.targetStopName}',
+            icon: Icons.notifications_active_rounded,
+          );
+        },
+        onRemove: () {
+          setState(() {
+            _alert = null;
+            _alertFired = false;
+          });
+          showToast(context, 'Travel alert removed', icon: Icons.notifications_off_rounded);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppState s = AppScope.of(context);
@@ -100,6 +178,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
       appBar: AppBar(
         title: Text('Tracking ${_bus.number}'),
         actions: <Widget>[
+          IconButton(
+            tooltip: 'SOS',
+            onPressed: () => pushPage(
+              context,
+              SosScreen(busNumber: _bus.number, destination: _bus.destination),
+            ),
+            icon: const Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+          ),
           IconButton(
             tooltip: s.t('favourite_route'),
             onPressed: () {
@@ -202,6 +288,41 @@ class _TrackingScreenState extends State<TrackingScreen> {
               ],
             ),
           ),
+          if (_alert != null) ...<Widget>[
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.brandSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.notifications_active_rounded, size: 16, color: AppColors.brand),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Alert set: ${_alert!.stopsBefore} stop${_alert!.stopsBefore == 1 ? '' : 's'} '
+                      'before ${_alert!.targetStopName}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.brandDark),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _openAlertSetup,
+                    style: TextButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Edit'),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           const SectionHeader(title: 'Route timetable'),
@@ -255,7 +376,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
           const SizedBox(height: 18),
 
           const SectionHeader(title: 'Travel actions'),
-          _ActionsGrid(bus: _bus, fav: fav),
+          _ActionsGrid(
+            bus: _bus,
+            fav: fav,
+            alertActive: _alert != null,
+            onSetAlert: _openAlertSetup,
+          ),
         ],
       ),
     );
@@ -358,9 +484,16 @@ class _StopsTimeline extends StatelessWidget {
 }
 
 class _ActionsGrid extends StatelessWidget {
-  const _ActionsGrid({required this.bus, required this.fav});
+  const _ActionsGrid({
+    required this.bus,
+    required this.fav,
+    required this.alertActive,
+    required this.onSetAlert,
+  });
   final Bus bus;
   final bool fav;
+  final bool alertActive;
+  final VoidCallback onSetAlert;
 
   @override
   Widget build(BuildContext context) {
@@ -424,10 +557,12 @@ class _ActionsGrid extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: btn(Icons.notifications_active_rounded, s.t('set_travel_alert'),
-                  () => showToast(context,
-                      'Alert set - we will notify you when Bus ${bus.number} is 5 min away',
-                      icon: Icons.notifications_active_rounded)),
+              child: btn(
+                alertActive ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                alertActive ? 'Alert on' : s.t('set_travel_alert'),
+                onSetAlert,
+                active: alertActive,
+              ),
             ),
           ],
         ),

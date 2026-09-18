@@ -16,8 +16,8 @@ class AiServiceException implements Exception {
 
 /// Talks to the OpenAI REST API directly over `http` - no SDK. Two
 /// capabilities are used by the MBMT Assistant:
-///   - [chatWithTool]: Chat Completions with a single function tool, for the
-///     trip-planning conversation.
+///   - [chatWithTools]: Chat Completions with one or more function tools, for
+///     the trip-planning and booking conversation.
 ///   - [transcribe]: Whisper speech-to-text for the voice input feature.
 ///
 /// The API key and model names are read at *build* time via `--dart-define`
@@ -43,19 +43,21 @@ class AiService {
         'Content-Type': 'application/json',
       };
 
-  /// One assistant turn that may use [tool] (a Chat Completions function-tool
-  /// definition, e.g. `{"type":"function","function":{...}}`).
+  /// One assistant turn that may use any of [tools] (Chat Completions
+  /// function-tool definitions, e.g. `{"type":"function","function":{...}}`).
   ///
-  /// If the model asks to call the tool, [onToolCall] is invoked with the
-  /// parsed JSON arguments and must return a JSON-encodable result; the
-  /// result is sent back to the model in a second request to produce the
-  /// final natural-language reply, which is what this method returns.
-  Future<String> chatWithTool({
+  /// If the model asks to call one or more tools, [onToolCall] is invoked
+  /// once per call with the tool's name and parsed JSON arguments, and must
+  /// return a JSON-encodable result; every result is sent back to the model
+  /// in a second request to produce the final natural-language reply, which
+  /// is what this method returns.
+  Future<String> chatWithTools({
     required String systemPrompt,
     required List<AiChatMessage> history,
     required String userMessage,
-    required Map<String, dynamic> tool,
-    required Map<String, dynamic> Function(Map<String, dynamic> arguments) onToolCall,
+    required List<Map<String, dynamic>> tools,
+    required Future<Map<String, dynamic>> Function(String name, Map<String, dynamic> arguments)
+        onToolCall,
   }) async {
     _requireConfigured();
 
@@ -66,10 +68,7 @@ class AiService {
       <String, dynamic>{'role': 'user', 'content': userMessage},
     ];
 
-    final Map<String, dynamic> first = await _postChat(
-      messages: messages,
-      tools: <Map<String, dynamic>>[tool],
-    );
+    final Map<String, dynamic> first = await _postChat(messages: messages, tools: tools);
 
     final Map<String, dynamic> firstMessage =
         (first['choices'] as List<dynamic>).first as Map<String, dynamic>;
@@ -81,31 +80,34 @@ class AiService {
       return _extractText(assistantMessage);
     }
 
-    final Map<String, dynamic> call = toolCalls.first as Map<String, dynamic>;
-    final Map<String, dynamic> fn = call['function'] as Map<String, dynamic>;
-    final String argsRaw = (fn['arguments'] as String?) ?? '{}';
+    messages.add(<String, dynamic>{
+      'role': 'assistant',
+      'content': assistantMessage['content'],
+      'tool_calls': toolCalls,
+    });
 
-    Map<String, dynamic> arguments;
-    try {
-      final Object? decoded = jsonDecode(argsRaw);
-      arguments = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-    } catch (_) {
-      arguments = <String, dynamic>{};
-    }
+    for (final dynamic rawCall in toolCalls) {
+      final Map<String, dynamic> call = rawCall as Map<String, dynamic>;
+      final Map<String, dynamic> fn = call['function'] as Map<String, dynamic>;
+      final String name = (fn['name'] as String?) ?? '';
+      final String argsRaw = (fn['arguments'] as String?) ?? '{}';
 
-    final Map<String, dynamic> toolResult = onToolCall(arguments);
+      Map<String, dynamic> arguments;
+      try {
+        final Object? decoded = jsonDecode(argsRaw);
+        arguments = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+      } catch (_) {
+        arguments = <String, dynamic>{};
+      }
 
-    messages
-      ..add(<String, dynamic>{
-        'role': 'assistant',
-        'content': assistantMessage['content'],
-        'tool_calls': toolCalls,
-      })
-      ..add(<String, dynamic>{
+      final Map<String, dynamic> toolResult = await onToolCall(name, arguments);
+
+      messages.add(<String, dynamic>{
         'role': 'tool',
         'tool_call_id': call['id'],
         'content': jsonEncode(toolResult),
       });
+    }
 
     final Map<String, dynamic> second = await _postChat(messages: messages);
     final Map<String, dynamic> secondChoice =

@@ -28,6 +28,12 @@ dependencies:
   # replacing the offline CustomPainter placeholder.
   flutter_map: ^8.3.2
   latlong2: ^0.10.0
+  # SOS screen: real device GPS + handing the SOS message to WhatsApp.
+  geolocator: ^14.0.0
+  url_launcher: ^6.3.0
+  # On-device persistence (tickets, favourites, contacts, reminders, settings)
+  # so a demo survives an app restart. No backend, no accounts.
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:

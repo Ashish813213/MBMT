@@ -6,9 +6,11 @@ import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import 'accessibility_screen.dart';
 import 'ai_assistant_screen.dart';
+import 'departure_reminders_screen.dart';
 import 'favourites_screen.dart';
 import 'language_screen.dart';
 import 'profile_subscreens.dart';
+import 'sos_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.embedded = false});
@@ -78,6 +80,21 @@ class ProfileScreen extends StatelessWidget {
               title: s.t('ai_assistant'),
               subtitle: 'Ask for routes, fares and directions',
               onTap: () => pushPage(context, const AiAssistantScreen()),
+            ),
+            const Divider(height: 1),
+            NavRow(
+              icon: Icons.warning_amber_rounded,
+              iconColor: AppColors.danger,
+              title: 'SOS',
+              subtitle: 'Share your live location and bus on WhatsApp',
+              onTap: () => pushPage(context, const SosScreen()),
+            ),
+            const Divider(height: 1),
+            NavRow(
+              icon: Icons.alarm_rounded,
+              title: 'Departure Reminders',
+              subtitle: '${s.departureReminders.length} set',
+              onTap: () => pushPage(context, const DepartureRemindersScreen()),
             ),
             const Divider(height: 1),
             NavRow(
